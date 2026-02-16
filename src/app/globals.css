@@ -1,26 +1,91 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0A0A0A;
+  --foreground: #FAFAFA;
+
+  --primary: #C9A05C;
+  --primary-dark: #A87F40;
+  --primary-light: #E0C080;
+
+  --card: #141414;
+  --card-glass: rgba(20, 20, 20, 0.8);
+  --border: #1F1F1F;
+  --hover: #1A1A1A;
+
+  --text-secondary: #9CA3AF;
+
+  --success: #10B981;
+  --warning: #FDE047;
+  --danger: #EF4444;
+  --info: #3B82F6;
 }
 
-@theme inline {
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-light: var(--primary-light);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --color-card: var(--card);
+  --color-card-glass: var(--card-glass);
+
+  --color-border-custom: var(--border);
+  --color-hover-custom: var(--hover);
+
+  --color-text-secondary: var(--text-secondary);
+
+  --font-outfit: var(--font-outfit);
+  --font-inter: var(--font-inter);
+
+  --background-image-glass-gradient: linear-gradient(135deg, rgba(201, 160, 92, 0.1) 0%, rgba(20, 20, 20, 0.8) 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border-custom outline-none;
+  }
+
+  body {
+    @apply bg-background text-foreground font-inter antialiased;
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-outfit font-bold;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom Effects */
+.glass-effect {
+  @apply bg-card-glass backdrop-blur-md border border-white/5;
+}
+
+.premium-gradient-text {
+  @apply bg-gradient-to-br from-primary to-primary-light bg-clip-text text-transparent;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-card;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-800 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-neutral-700;
 }
