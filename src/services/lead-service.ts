@@ -89,21 +89,31 @@ export const leadService = {
     },
 
     async getInteractions(leadId: string): Promise<Interaction[]> {
-        console.log("Fetching interactions for lead:", leadId);
-        // Simulation
-        return [
-            { id: "1", lead_id: leadId, type: "status_change", content: "Lead captado via Radar AI", created_at: new Date().toISOString() }
-        ];
+        const { data, error } = await supabase
+            .from('interactions')
+            .select('*')
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as Interaction[];
     },
 
     async addInteraction(leadId: string, interaction: Omit<Interaction, "id" | "created_at">): Promise<void> {
-        // Mock add
-        console.log(`Adding interaction to ${leadId}:`, interaction);
+        const { error } = await supabase
+            .from('interactions')
+            .insert([{ ...interaction, lead_id: leadId }]);
+
+        if (error) throw error;
     },
 
     async updateStatus(leadId: string, status: Lead['status']): Promise<void> {
-        // Mock status update
-        console.log(`Updating lead ${leadId} status to: ${status}`);
+        const { error } = await supabase
+            .from('leads')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', leadId);
+
+        if (error) throw error;
 
         // Auto-log status change
         await this.addInteraction(leadId, {

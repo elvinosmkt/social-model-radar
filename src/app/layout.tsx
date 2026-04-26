@@ -13,7 +13,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Social Model Radar | Premium Model Scouting",
+  title: "DWS SCOUTER | Plataforma de Scouting de Modelos",
   description: "Plataforma avançada para identificação e gestão de perfis com potencial para modelagem.",
 };
 

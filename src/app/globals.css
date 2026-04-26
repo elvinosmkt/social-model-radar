@@ -1,24 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0A0A0A;
-  --foreground: #FAFAFA;
+  --background: #050505;
+  --foreground: #FFFFFF;
 
-  --primary: #C9A05C;
-  --primary-dark: #A87F40;
-  --primary-light: #E0C080;
+  --primary: #D4AF37; /* Metallic Gold */
+  --primary-dark: #B8860B;
+  --primary-light: #F9E2AF;
 
-  --card: #141414;
-  --card-glass: rgba(20, 20, 20, 0.8);
-  --border: #1F1F1F;
-  --hover: #1A1A1A;
+  --card: #0D0D0D;
+  --card-glass: rgba(13, 13, 13, 0.7);
+  --border: rgba(255, 255, 255, 0.05);
+  --hover: rgba(255, 255, 255, 0.02);
 
-  --text-secondary: #9CA3AF;
+  --text-secondary: #8E8E93;
 
-  --success: #10B981;
-  --warning: #FDE047;
-  --danger: #EF4444;
-  --info: #3B82F6;
+  --success: #30D158;
+  --warning: #FFD60A;
+  --danger: #FF453A;
+  --info: #0A84FF;
 }
 
 @theme {
@@ -65,11 +65,24 @@
 
 /* Custom Effects */
 .glass-effect {
-  @apply bg-card-glass backdrop-blur-md border border-white/5;
+  @apply bg-card-glass backdrop-blur-2xl border border-white/5 shadow-2xl;
+}
+
+.premium-card {
+  @apply bg-card-glass backdrop-blur-2xl border border-white/5 shadow-2xl hover:border-primary/20 transition-all duration-500 relative overflow-hidden;
+}
+
+.premium-card::after {
+  content: '';
+  @apply absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity duration-500;
+}
+
+.premium-card:hover::after {
+  @apply opacity-100;
 }
 
 .premium-gradient-text {
-  @apply bg-gradient-to-br from-primary to-primary-light bg-clip-text text-transparent;
+  @apply bg-gradient-to-br from-primary via-primary-light to-primary bg-clip-text text-transparent;
 }
 
 /* Scrollbar */
