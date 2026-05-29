@@ -1,8 +1,15 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+const defaultOpenAI = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || 'placeholder-key',
 });
+
+function getOpenAIClient(customApiKey?: string): OpenAI {
+    if (customApiKey && customApiKey.trim() !== '') {
+        return new OpenAI({ apiKey: customApiKey });
+    }
+    return defaultOpenAI;
+}
 
 const MODEL = "gpt-4o-mini";
 
@@ -26,8 +33,9 @@ export interface ScoutingFilters {
 }
 
 export const aiService = {
-    async processScoutingPrompt(prompt: string): Promise<ScoutingFilters> {
+    async processScoutingPrompt(prompt: string, customApiKey?: string): Promise<ScoutingFilters> {
         try {
+            const openai = getOpenAIClient(customApiKey);
             const response = await openai.chat.completions.create({
                 model: MODEL,
                 messages: [
@@ -79,8 +87,9 @@ export const aiService = {
         }
     },
 
-    async analyzeProfile(handle: string, bio: string, platform: string): Promise<AIAnalysisResult> {
+    async analyzeProfile(handle: string, bio: string, platform: string, customApiKey?: string): Promise<AIAnalysisResult> {
         try {
+            const openai = getOpenAIClient(customApiKey);
             const response = await openai.chat.completions.create({
                 model: MODEL,
                 messages: [
@@ -118,8 +127,9 @@ export const aiService = {
         }
     },
 
-    async generateFiltersFromProfile(profileData: any): Promise<ScoutingFilters> {
+    async generateFiltersFromProfile(profileData: any, customApiKey?: string): Promise<ScoutingFilters> {
         try {
+            const openai = getOpenAIClient(customApiKey);
             const response = await openai.chat.completions.create({
                 model: MODEL,
                 messages: [

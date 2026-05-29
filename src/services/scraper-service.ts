@@ -17,19 +17,19 @@ export interface ScrapedLead {
     is_private?: boolean;
 }
 
-const client = new ApifyClient({
-    token: process.env.APIFY_API_TOKEN || '',
-});
-
 export const scraperService = {
-    async searchLeads(filters: ScoutingFilters): Promise<ScrapedLead[]> {
+    async searchLeads(filters: ScoutingFilters, customToken?: string): Promise<ScrapedLead[]> {
         console.log("🚀 Iniciando busca real no Instagram via Apify...");
         console.log("🔍 Filtros recebidos:", JSON.stringify(filters, null, 2));
 
-        if (!process.env.APIFY_API_TOKEN) {
-            console.error("❌ Token do Apify não configurado no .env.local!");
+        const token = customToken || process.env.APIFY_API_TOKEN || '';
+
+        if (!token) {
+            console.error("❌ Token do Apify não configurado!");
             throw new Error("Configuração ausente: APIFY_API_TOKEN");
         }
+
+        const client = new ApifyClient({ token });
 
         const limit = filters.limit || 10;
 

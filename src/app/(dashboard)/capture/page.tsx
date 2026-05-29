@@ -241,7 +241,12 @@ export default function CapturePage() {
 
         try {
             if (mode === 'prompt') {
-                const { filters: extractedFilters, results: searchResults, creditsConsumed } = await captureAndAnalyzeLeadsAction(searchQuery, quantity);
+                const res = await captureAndAnalyzeLeadsAction(searchQuery, quantity);
+                if (res && 'error' in res && res.error) {
+                    showNotification('error', 'Erro na Busca', res.error);
+                    return;
+                }
+                const { filters: extractedFilters, results: searchResults, creditsConsumed } = res as any;
                 setResults(searchResults);
                 setFilters(extractedFilters);
 
@@ -251,7 +256,12 @@ export default function CapturePage() {
                     setBalance(prev => Math.max(0, prev - creditsConsumed));
                 }
             } else {
-                const { results: searchResults, filters: extractedFilters, creditsConsumed } = await captureSimilarLeadsAction(searchQuery, quantity);
+                const res = await captureSimilarLeadsAction(searchQuery, quantity);
+                if (res && 'error' in res && res.error) {
+                    showNotification('error', 'Erro na Busca', res.error);
+                    return;
+                }
+                const { results: searchResults, filters: extractedFilters, creditsConsumed } = res as any;
                 setResults(searchResults);
                 setFilters(extractedFilters);
 
