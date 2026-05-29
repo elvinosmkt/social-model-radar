@@ -15,7 +15,7 @@ interface ScoutingChartsProps {
 }
 
 export function ScoutingCharts({ statusStats, nicheStats }: ScoutingChartsProps) {
-    const maxStatusValue = Math.max(...statusStats.map(s => s.value));
+    const maxStatusValue = Math.max(...statusStats.map(s => s.value)) || 1;
     const totalNicheValue = nicheStats.reduce((acc, curr) => acc + curr.value, 0);
 
     return (

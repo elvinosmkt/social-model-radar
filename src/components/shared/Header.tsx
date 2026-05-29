@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
     Search,
     Bell,
@@ -17,7 +18,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle, showActions = true }: HeaderProps) {
     return (
-        <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-white/5 px-8 py-4">
+        <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-white/5 px-4 md:px-8 py-4">
             <div className="flex items-center justify-between">
                 <div className="space-y-1">
                     <h2 className="text-xl font-outfit font-bold">{title}</h2>
@@ -43,10 +44,13 @@ export function Header({ title, subtitle, showActions = true }: HeaderProps) {
                         </button>
 
                         {showActions && (
-                            <button className="flex items-center gap-2 bg-primary text-black px-4 py-2 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity">
+                            <Link
+                                href="/capture"
+                                className="hidden md:flex items-center gap-2 bg-primary text-black px-4 py-2 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity"
+                            >
                                 <Plus className="w-4 h-4" />
                                 <span>Captar Modelos</span>
-                            </button>
+                            </Link>
                         )}
                     </div>
                 </div>

@@ -89,3 +89,4 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-neutral-700;
 }
+/* Trigger Tailwind CSS v4 rebuild for new components */

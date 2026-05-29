@@ -57,9 +57,17 @@ export const leadService = {
     },
 
     async createLead(lead: Partial<Lead>) {
+        // Obter o usuário autenticado para vinculação automática (RLS compliant)
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const leadWithUser = {
+            ...lead,
+            assigned_to: lead.assigned_to || user?.id || null
+        };
+
         const { data, error } = await supabase
             .from('leads')
-            .insert([lead])
+            .insert([leadWithUser])
             .select()
             .single();
 
@@ -89,21 +97,56 @@ export const leadService = {
     },
 
     async getInteractions(leadId: string): Promise<Interaction[]> {
-        console.log("Fetching interactions for lead:", leadId);
-        // Simulation
-        return [
-            { id: "1", lead_id: leadId, type: "status_change", content: "Lead captado via Radar AI", created_at: new Date().toISOString() }
-        ];
+        console.log("Fetching interactions for lead from Supabase:", leadId);
+        const { data, error } = await supabase
+            .from('interactions')
+            .select('*')
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // If no interactions found yet, insert default "Lead captado"
+        if (data.length === 0) {
+            const defaultInteraction = {
+                lead_id: leadId,
+                type: 'status_change' as const,
+                content: 'Lead captado via Radar AI'
+            };
+            await this.addInteraction(leadId, defaultInteraction);
+            
+            // Re-fetch
+            const { data: refetched } = await supabase
+                .from('interactions')
+                .select('*')
+                .eq('lead_id', leadId)
+                .order('created_at', { ascending: false });
+            return (refetched || [defaultInteraction]) as Interaction[];
+        }
+
+        return data as Interaction[];
     },
 
     async addInteraction(leadId: string, interaction: Omit<Interaction, "id" | "created_at">): Promise<void> {
-        // Mock add
-        console.log(`Adding interaction to ${leadId}:`, interaction);
+        const { error } = await supabase
+            .from('interactions')
+            .insert([{
+                lead_id: leadId,
+                user_id: interaction.user_id || null,
+                type: interaction.type,
+                content: interaction.content
+            }]);
+
+        if (error) throw error;
     },
 
     async updateStatus(leadId: string, status: Lead['status']): Promise<void> {
-        // Mock status update
-        console.log(`Updating lead ${leadId} status to: ${status}`);
+        const { error } = await supabase
+            .from('leads')
+            .update({ status, updated_at: new Date().toISOString() })
+            .eq('id', leadId);
+
+        if (error) throw error;
 
         // Auto-log status change
         await this.addInteraction(leadId, {
@@ -112,60 +155,106 @@ export const leadService = {
             content: `Status alterado para ${status.replace('_', ' ')}`
         });
     },
+
     async getStatusStats() {
-        // Mock stats based on different statuses
+        const { data, error } = await supabase
+            .from('leads')
+            .select('status');
+
+        if (error) throw error;
+
+        const counts: Record<string, number> = {
+            new: 0,
+            approaching: 0,
+            approached: 0,
+            in_conversation: 0,
+            selected: 0,
+            converted: 0,
+            lost: 0
+        };
+
+        data?.forEach(lead => {
+            if (lead.status in counts) {
+                counts[lead.status]++;
+            }
+        });
+
         return [
-            { name: 'Novos', value: 120, color: '#00F5FF' },
-            { name: 'Abordados', value: 85, color: '#3B82F6' },
-            { name: 'Em Conversa', value: 45, color: '#F59E0B' },
-            { name: 'Selecionados', value: 12, color: '#10B981' },
+            { name: 'Novos', value: counts.new, color: '#3B82F6' },
+            { name: 'Para Abordar', value: counts.approaching, color: '#8B5CF6' },
+            { name: 'Abordados', value: counts.approached, color: '#F59E0B' },
+            { name: 'Em Conversa', value: counts.in_conversation, color: '#EC4899' },
+            { name: 'Selecionados', value: counts.selected, color: '#10B981' },
         ];
     },
 
     async getNicheStats() {
-        return [
-            { name: 'Beauty', value: 45 },
-            { name: 'Fashion', value: 30 },
-            { name: 'Lifestyle', value: 15 },
-            { name: 'Fitness', value: 10 },
-        ];
+        const { data, error } = await supabase
+            .from('leads')
+            .select('niche');
+
+        if (error) throw error;
+
+        const counts: Record<string, number> = {};
+        data?.forEach(lead => {
+            if (lead.niche) {
+                const name = lead.niche.charAt(0).toUpperCase() + lead.niche.slice(1).toLowerCase();
+                counts[name] = (counts[name] || 0) + 1;
+            }
+        });
+
+        const total = data?.filter(lead => lead.niche).length || 0;
+
+        const sorted = Object.entries(counts)
+            .map(([name, value]) => ({ 
+                name, 
+                value: total > 0 ? Math.round((value / total) * 100) : 0 
+            }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 4);
+
+        if (sorted.length === 0) {
+            return [
+                { name: 'Beauty', value: 0 },
+                { name: 'Fashion', value: 0 },
+                { name: 'Lifestyle', value: 0 },
+                { name: 'Fitness', value: 0 },
+            ];
+        }
+
+        return sorted;
     },
 
     async getComparisonLeads(): Promise<Lead[]> {
-        return [
-            {
-                id: "1",
-                handle: "@isabella.f",
-                name: "Isabella Ferreira",
-                status: "new",
-                ai_score: 92,
-                followers: 45000,
-                niche: "Beauty",
-                updated_at: new Date().toISOString(),
-                platform: "instagram"
-            },
-            {
-                id: "2",
-                handle: "@adriana_m40",
-                name: "Adriana Medeiros",
-                status: "approaching",
-                ai_score: 85,
-                followers: 12000,
-                niche: "Fashion",
-                updated_at: new Date().toISOString(),
-                platform: "instagram"
-            },
-            {
-                id: "3",
-                handle: "@carol_style",
-                name: "Carolina Santos",
-                status: "in_conversation",
-                ai_score: 78,
-                followers: 8500,
-                niche: "Lifestyle",
-                updated_at: new Date().toISOString(),
-                platform: "instagram"
-            }
-        ];
+        const { data, error } = await supabase
+            .from('leads')
+            .select('*')
+            .order('ai_score', { ascending: false })
+            .limit(3);
+
+        if (error) throw error;
+        return data as Lead[];
+    },
+
+    async getRecentActivities() {
+        const { data, error } = await supabase
+            .from('interactions')
+            .select(`
+                id,
+                lead_id,
+                type,
+                content,
+                created_at,
+                leads:lead_id ( handle )
+            `)
+            .order('created_at', { ascending: false })
+            .limit(5);
+
+        if (error) {
+            console.error("Failed to fetch activities:", error);
+            return [];
+        }
+
+        return data as any[];
     }
 };

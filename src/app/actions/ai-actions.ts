@@ -24,34 +24,34 @@ export async function captureAndAnalyzeLeadsAction(userPrompt: string) {
     }
 
     // 2. Discover leads (Real Scraper)
-    const rawLeads = await scraperService.searchLeads(activeFilters);
+    // O scraper já filtra por seguidores, remove privados, e limita a 10 resultados
+    const leads = await scraperService.searchLeads(activeFilters);
+    console.log(`📊 Scraper retornou ${leads.length} leads já filtrados`);
 
-    // 3. Filtragem Lógica (Seguidores)
-    let filteredLeads = rawLeads;
-    if (activeFilters.minFollowers || activeFilters.maxFollowers) {
-        filteredLeads = rawLeads.filter(lead => {
-            const min = activeFilters.minFollowers || 0;
-            const max = activeFilters.maxFollowers || 1000000000;
-            return lead.followers >= min && lead.followers <= max;
-        });
-    }
-
-    const leadsToAnalyze = filteredLeads.length > 0 ? filteredLeads : rawLeads.slice(0, 5);
-
-    // 4. Analyze each lead (with error handling for AI quota)
+    // 3. Analyze each lead with AI (with error handling for AI quota)
     const analyzedResults = await Promise.all(
-        leadsToAnalyze.map(async (lead: ScrapedLead) => {
+        leads.map(async (lead: ScrapedLead) => {
             let ai_niche = "Pendente";
             let ai_score = 50;
             let ai_summary = "Análise indisponível (verifique créditos da API)";
             let age_range = "N/A";
+            let ai_characteristics: string[] = [];
 
             try {
-                const analysis = await aiService.analyzeProfile(lead.handle, lead.bio, lead.platform);
+                // Passar mais contexto para a IA gerar análises mais precisas
+                const enrichedBio = [
+                    lead.bio,
+                    lead.followers ? `Seguidores: ${lead.followers}` : '',
+                    lead.post_count ? `Posts: ${lead.post_count}` : '',
+                    lead.is_business ? 'Conta Business' : '',
+                    lead.business_category ? `Categoria: ${lead.business_category}` : '',
+                ].filter(Boolean).join(' | ');
+                const analysis = await aiService.analyzeProfile(lead.handle, enrichedBio, lead.platform);
                 ai_niche = analysis.niche;
                 ai_score = analysis.score;
                 ai_summary = analysis.summary;
                 age_range = analysis.age_range;
+                ai_characteristics = analysis.characteristics || [];
             } catch (e) {
                 // Silently fail AI analysis and keep defaults
             }
@@ -61,14 +61,18 @@ export async function captureAndAnalyzeLeadsAction(userPrompt: string) {
                 ai_score,
                 ai_niche,
                 ai_summary,
-                age_range
+                age_range,
+                ai_characteristics
             };
         })
     );
 
+    // 4. Ordenar por AI score (perfis brasileiros e relevantes primeiro)
+    const sortedResults = analyzedResults.sort((a, b) => b.ai_score - a.ai_score);
+
     return {
         filters: activeFilters,
-        results: analyzedResults
+        results: sortedResults
     };
 }
 

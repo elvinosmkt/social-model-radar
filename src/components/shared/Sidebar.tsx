@@ -12,6 +12,7 @@ import {
     Sparkles
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { useAuth } from "@/lib/context/AuthContext";
 
 const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -24,9 +25,15 @@ const navItems = [
 
 export function Sidebar() {
     const pathname = usePathname();
+    const { user, signOut } = useAuth();
+
+    // Get initials or email prefix for the avatar
+    const email = user?.email || "admin@smr.com";
+    const displayName = email.split('@')[0];
+    const initials = displayName.slice(0, 2).toUpperCase();
 
     return (
-        <div className="fixed left-0 top-0 h-screen w-64 bg-card-glass backdrop-blur-xl border-r border-white/5 flex flex-col z-50">
+        <div className="fixed left-0 top-0 h-screen w-64 bg-card-glass backdrop-blur-xl border-r border-white/5 hidden md:flex flex-col z-50">
             <div className="p-6 border-b border-white/5">
                 <h1 className="text-2xl font-outfit font-bold premium-gradient-text tracking-tight">
                     SMR RADAR
@@ -62,16 +69,19 @@ export function Sidebar() {
 
             <div className="p-4 border-t border-white/5">
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                        AD
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold uppercase">
+                        {initials}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">Admin User</p>
-                        <p className="text-xs text-text-secondary truncate">Agência de Modelos</p>
+                        <p className="text-sm font-medium truncate capitalize">{displayName}</p>
+                        <p className="text-xs text-text-secondary truncate">{email}</p>
                     </div>
                 </div>
 
-                <button className="flex items-center gap-3 w-full px-4 py-3 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-xl transition-all duration-300 group">
+                <button
+                    onClick={signOut}
+                    className="flex items-center gap-3 w-full px-4 py-3 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-xl transition-all duration-300 group"
+                >
                     <LogOut className="w-5 h-5 group-hover:scale-110 transition-transform" />
                     <span className="font-medium text-sm">Sair</span>
                 </button>

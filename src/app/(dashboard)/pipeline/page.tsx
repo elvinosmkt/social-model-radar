@@ -9,7 +9,7 @@ export default function PipelinePage() {
                 subtitle="Gerencie o progresso das suas prospecções."
             />
 
-            <div className="p-8 pb-0 overflow-hidden flex-1 flex flex-col">
+            <div className="p-4 md:p-8 pb-0 overflow-hidden flex-1 flex flex-col no-scrollbar">
                 <Pipeline />
             </div>
         </div>
