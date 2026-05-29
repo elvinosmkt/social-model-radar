@@ -31,6 +31,8 @@ export const scraperService = {
             throw new Error("Configuração ausente: APIFY_API_TOKEN");
         }
 
+        const limit = filters.limit || 10;
+
         try {
             // Lógica de Detecção de Handle: Só considera handle se começar com @
             const isHandle = filters.niche?.startsWith('@');
@@ -86,11 +88,12 @@ export const scraperService = {
 
                 // Formato correto: search é string separada por vírgulas SEM espaço após a vírgula
                 const searchString = sanitizedKeywords.join(',');
+                const searchLimit = Math.max(50, limit * 3);
 
                 const input = {
                     "search": searchString,
                     "searchType": "user",
-                    "searchLimit": 50, // 50 por keyword × 5 keywords = ~250 candidatos
+                    "searchLimit": searchLimit, // 50 por keyword × 5 keywords = ~250 candidatos
                     "enhanceUserSearchWithFacebookPage": false,
                 };
 
@@ -114,8 +117,8 @@ export const scraperService = {
                      }
                  }
 
-                // Limitar para os top 20 perfis mais relevantes para enriquecer
-                const usernamesToScrape = uniqueUsernames.slice(0, 20);
+                // Limitar para os perfis mais relevantes para enriquecer (2x mais do que o limite solicitado)
+                const usernamesToScrape = uniqueUsernames.slice(0, Math.max(20, limit * 2));
                 console.log(`👤 2. Enriquecendo detalhes de ${usernamesToScrape.length} perfis:`, usernamesToScrape);
 
                 if (usernamesToScrape.length > 0) {
@@ -198,8 +201,8 @@ export const scraperService = {
             // Filtrar perfis privados
             const publicItems = filteredItems.filter((item: any) => !item.private);
 
-            // Limitar para no máximo 10 resultados
-            const limitedItems = publicItems.slice(0, 10);
+            // Limitar para no máximo {limit} resultados
+            const limitedItems = publicItems.slice(0, limit);
 
             console.log(`✅ Pipeline: ${items.length} brutos → ${uniqueItems.length} únicos → ${filteredItems.length} filtrados → ${publicItems.length} públicos → ${limitedItems.length} retornados`);
 

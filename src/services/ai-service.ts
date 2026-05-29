@@ -22,6 +22,7 @@ export interface ScoutingFilters {
     ageRange?: string;
     platforms?: string[];
     searchKeywords?: string[];
+    limit?: number;
 }
 
 export const aiService = {

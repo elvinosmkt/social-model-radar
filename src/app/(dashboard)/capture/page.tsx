@@ -233,7 +233,7 @@ export default function CapturePage() {
 
         try {
             if (mode === 'prompt') {
-                const { filters: extractedFilters, results: searchResults } = await captureAndAnalyzeLeadsAction(searchQuery);
+                const { filters: extractedFilters, results: searchResults } = await captureAndAnalyzeLeadsAction(searchQuery, quantity);
                 setResults(searchResults);
                 setFilters(extractedFilters);
 
@@ -243,7 +243,7 @@ export default function CapturePage() {
                     setBalance(prev => Math.max(0, prev - quantity));
                 }
             } else {
-                const searchResults = await captureSimilarLeadsAction(searchQuery);
+                const searchResults = await captureSimilarLeadsAction(searchQuery, quantity);
                 setResults(searchResults.results);
                 setFilters(searchResults.filters);
 
