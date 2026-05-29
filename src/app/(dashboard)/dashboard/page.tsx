@@ -106,6 +106,37 @@ export default function DashboardPage() {
             />
 
             <div className="p-4 md:p-8 space-y-6 md:space-y-8 overflow-y-auto no-scrollbar">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+                    {/* AI Notification Bar */}
+                    <div className="lg:col-span-2 p-4 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-between group cursor-pointer hover:bg-primary/15 transition-all">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_20px_rgba(var(--primary-rgb),0.4)]">
+                                <Sparkles className="w-5 h-5 text-black" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold font-outfit">Análise de IA Concluída</p>
+                                <p className="text-xs text-text-secondary">Encontramos 15 novos perfis com fit score superior a 90% hoje.</p>
+                            </div>
+                        </div>
+                        <ArrowUpRight className="w-5 h-5 text-text-secondary group-hover:text-primary transition-colors" />
+                    </div>
+
+                    {/* Daily Goals Card */}
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-success/20 border border-success/30 flex items-center justify-center">
+                                <Target className="w-5 h-5 text-success" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-widest text-text-secondary">Meta Diária (Webscouter)</p>
+                                <p className="text-lg font-outfit font-bold">12 / 30 <span className="text-xs font-normal text-text-secondary">Abordagens</span></p>
+                            </div>
+                        </div>
+                        <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div className="h-full bg-success w-[40%]" />
+                        </div>
+                    </div>
+                </div>
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                     {stats.map((stat, i) => (

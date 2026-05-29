@@ -2,186 +2,162 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Mail, Lock, Loader2, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { Zap, Eye, EyeOff, Loader2, AlertCircle, Shield, Briefcase } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/context/AuthContext";
 
+// ── Mock users com hierarquia correta ────────────────────────────
+const MOCK_USERS = [
+    { email: "admin@dwsscouter.com",     password: "admin123",    role: "admin",      name: "Administrador",  redirect: "/admin"    },
+    { email: "carlos@dwsscouter.com",    password: "vendedor123", role: "vendedor",   name: "Carlos Mendes",  redirect: "/vendedor" },
+    { email: "rafaela@dwsscouter.com",   password: "scout123",    role: "webscouter", name: "Rafaela Costa",  redirect: "/dashboard" },
+];
+
+const ROLE_DEMOS = [
+    { role: "admin",      label: "ADM",        email: "admin@dwsscouter.com",   password: "admin123",    icon: Shield,   color: "bg-primary/10 border-primary/20 text-primary",      desc: "Acesso total + gestão de vendedores" },
+    { role: "vendedor",   label: "VENDEDOR",   email: "carlos@dwsscouter.com",  password: "vendedor123", icon: Briefcase,color: "bg-blue-500/10 border-blue-500/20 text-blue-400",   desc: "Gerencia equipe e distribui créditos" },
+    { role: "webscouter", label: "WEBSCOUTER", email: "rafaela@dwsscouter.com", password: "scout123",    icon: Zap,      color: "bg-purple-500/10 border-purple-500/20 text-purple-400", desc: "Captação e abordagem de leads" },
+];
+
 export default function LoginPage() {
     const router = useRouter();
-    const { user, loading } = useAuth();
-
-    const [isSignUp, setIsSignUp] = useState(false);
+    const { user, loading: authLoading } = useAuth();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [errorMsg, setErrorMsg] = useState("");
-    const [successMsg, setSuccessMsg] = useState("");
+    const [showPass, setShowPass] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
-    // If user is already authenticated, redirect them to dashboard
+    // If user is already authenticated (via Supabase), redirect to dashboard
     useEffect(() => {
-        if (!loading && user) {
+        if (!authLoading && user) {
             router.push("/dashboard");
         }
-    }, [user, loading, router]);
+    }, [user, authLoading, router]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        setErrorMsg("");
-        setSuccessMsg("");
-        setIsSubmitting(true);
+        setError("");
+        setLoading(true);
 
+        // 1. Check if mock user matches
+        const matchedMock = MOCK_USERS.find(u => u.email === email && u.password === password);
+        if (matchedMock) {
+            await new Promise(r => setTimeout(r, 800));
+            router.push(matchedMock.redirect);
+            return;
+        }
+
+        // 2. Fallback to Supabase Auth
         try {
-            if (isSignUp) {
-                // Supabase sign up
-                const { data, error } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        emailRedirectTo: window.location.origin + "/dashboard",
-                    }
-                });
-
-                if (error) throw error;
-
-                if (data.user && data.session === null) {
-                    setSuccessMsg("Conta criada com sucesso! Verifique seu e-mail para confirmação.");
-                } else {
-                    router.push("/dashboard");
-                }
-            } else {
-                // Supabase sign in
-                const { error } = await supabase.auth.signInWithPassword({
-                    email,
-                    password,
-                });
-
-                if (error) throw error;
-                router.push("/dashboard");
-            }
-        } catch (error: any) {
-            console.error("Auth error:", error);
-            setErrorMsg(error.message || "Ocorreu um erro no processo de autenticação.");
-        } finally {
-            setIsSubmitting(false);
+            const { error: authError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+            if (authError) throw authError;
+            router.push("/dashboard");
+        } catch (err: any) {
+            console.error("Auth error:", err);
+            setError(err.message || "E-mail ou senha incorretos.");
+            setLoading(false);
         }
     };
 
-    if (loading || user) {
+    if (authLoading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <div className="flex flex-col items-center gap-3">
                     <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    <p className="text-sm text-text-secondary">Carregando...</p>
+                    <p className="text-sm text-text-secondary font-medium">Carregando...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="relative flex min-h-screen w-screen items-center justify-center bg-background overflow-hidden p-4">
-            {/* Ambient Background Glows */}
-            <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-1/4 right-1/4 w-[450px] h-[450px] bg-purple-500/5 rounded-full blur-[120px] pointer-events-none" />
+        <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
+            {/* Fundo decorativo */}
+            <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
+                <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-purple-500/5 blur-3xl" />
+            </div>
 
-            <div className="w-full max-w-md relative z-10 space-y-8">
-                {/* Logo & Title */}
-                <div className="text-center space-y-2">
-                    <div className="mx-auto w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-[0_0_30px_rgba(201,160,92,0.15)] mb-4">
-                        <Sparkles className="w-6 h-6 text-primary animate-pulse" />
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+                className="relative w-full max-w-md px-6">
+                <div className="glass-effect rounded-3xl p-10 border border-white/8 shadow-2xl">
+                    {/* Logo */}
+                    <div className="flex flex-col items-center mb-8">
+                        <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-[0_0_40px_rgba(212,175,55,0.4)] mb-4">
+                            <Zap className="w-7 h-7 text-black" />
+                        </div>
+                        <h1 className="text-2xl font-outfit font-bold premium-gradient-text tracking-tight animate-pulse">DWS SCOUTER</h1>
+                        <p className="text-xs text-text-secondary uppercase tracking-[0.2em] mt-1 font-semibold">Digital Web Scouter</p>
                     </div>
-                    <h1 className="text-3xl font-outfit font-extrabold tracking-tight text-white">
-                        SMR RADAR
-                    </h1>
-                    <p className="text-xs text-text-secondary uppercase tracking-[0.25em] font-semibold">
-                        Social Model Scouting Platform
-                    </p>
-                </div>
 
-                {/* Form Card */}
-                <div className="backdrop-blur-md bg-white/[0.02] border border-white/[0.05] rounded-[2.5rem] p-8 shadow-[0_30px_60px_rgba(0,0,0,0.5)] shadow-primary/5">
-                    <h2 className="text-xl font-bold font-outfit text-white mb-6">
-                        {isSignUp ? "Criar nova conta" : "Entrar na plataforma"}
-                    </h2>
+                    {/* Hierarquia visual */}
+                    <div className="flex items-center justify-center gap-2 mb-6 text-[10px] font-bold">
+                        <span className="px-2 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20">ADM</span>
+                        <span className="text-white/20">›</span>
+                        <span className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">VENDEDOR</span>
+                        <span className="text-white/20">›</span>
+                        <span className="px-2 py-1 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">WEBSCOUTER</span>
+                    </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Error Message */}
-                        {errorMsg && (
-                            <div className="p-4 rounded-2xl bg-danger/10 border border-danger/20 text-danger text-xs font-semibold leading-relaxed">
-                                {errorMsg}
-                            </div>
-                        )}
-
-                        {/* Success Message */}
-                        {successMsg && (
-                            <div className="p-4 rounded-2xl bg-success/10 border border-success/20 text-success text-xs font-semibold leading-relaxed">
-                                {successMsg}
-                            </div>
-                        )}
-
-                        {/* Email Input */}
+                    <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary px-1">E-mail</label>
+                            <label className="text-[11px] font-bold uppercase tracking-widest text-text-secondary">E-mail</label>
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" required
+                                className="w-full bg-white/5 border border-white/10 focus:border-primary/50 rounded-xl px-4 py-3 text-sm outline-none transition-all placeholder:text-text-secondary/40 text-white font-medium" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold uppercase tracking-widest text-text-secondary">Senha</label>
                             <div className="relative">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/60" />
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="seuemail@exemplo.com"
-                                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3 pl-12 pr-4 text-sm text-white placeholder:text-text-secondary/40 focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                />
+                                <input type={showPass ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required
+                                    className="w-full bg-white/5 border border-white/10 focus:border-primary/50 rounded-xl px-4 py-3 pr-12 text-sm outline-none transition-all placeholder:text-text-secondary/40 text-white font-medium" />
+                                <button type="button" onClick={() => setShowPass(!showPass)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-text-secondary hover:text-foreground transition-colors">
+                                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
                             </div>
                         </div>
 
-                        {/* Password Input */}
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary px-1">Senha</label>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary/60" />
-                                <input
-                                    type="password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    className="w-full bg-white/[0.03] border border-white/[0.06] rounded-2xl py-3 pl-12 pr-4 text-sm text-white placeholder:text-text-secondary/40 focus:outline-none focus:border-primary/50 transition-all font-medium"
-                                />
-                            </div>
-                        </div>
+                        {error && (
+                            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                                className="flex items-center gap-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+                                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                                <p className="text-xs text-red-400 font-medium">{error}</p>
+                            </motion.div>
+                        )}
 
-                        {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="w-full mt-2 py-3.5 rounded-2xl bg-gradient-to-r from-primary to-primary-light text-black text-sm font-extrabold hover:opacity-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50"
-                        >
-                            {isSubmitting ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                                <>
-                                    <span>{isSignUp ? "Registrar Conta" : "Acessar Plataforma"}</span>
-                                    <ArrowRight className="w-4 h-4" />
-                                </>
-                            )}
+                        <button type="submit" disabled={loading}
+                            className="w-full py-3.5 rounded-xl bg-primary text-black font-bold text-sm hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20">
+                            {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Entrando…</> : "Entrar na Plataforma"}
                         </button>
                     </form>
 
-                    {/* Toggle Mode Link */}
-                    <div className="mt-6 text-center">
-                        <button
-                            onClick={() => {
-                                setIsSignUp(!isSignUp);
-                                setErrorMsg("");
-                                setSuccessMsg("");
-                            }}
-                            className="text-xs font-semibold text-text-secondary hover:text-primary transition-colors"
-                        >
-                            {isSignUp ? "Já tem uma conta? Faça Login" : "Não tem conta? Crie uma agora"}
-                        </button>
+                    {/* Demo roles */}
+                    <div className="mt-8 space-y-3">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-text-secondary text-center">Acessos de Demonstração</p>
+                        <div className="space-y-2">
+                            {ROLE_DEMOS.map(d => (
+                                <button key={d.role} onClick={() => { setEmail(d.email); setPassword(d.password); }}
+                                    className={cn("w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all hover:opacity-90 text-left", d.color)}>
+                                    <d.icon className="w-4 h-4 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold uppercase tracking-wider">{d.label}</p>
+                                        <p className="text-[10px] opacity-70 truncate">{d.desc}</p>
+                                    </div>
+                                    <span className="text-[10px] opacity-60 font-mono flex-shrink-0">clique p/ preencher</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
-            </div>
+
+                <p className="text-center text-[11px] text-text-secondary mt-6">DWS SCOUTER © 2025 · Antigravity Agency</p>
+            </motion.div>
         </div>
     );
 }

@@ -131,10 +131,9 @@ export const leadService = {
         const { error } = await supabase
             .from('interactions')
             .insert([{
+                ...interaction,
                 lead_id: leadId,
-                user_id: interaction.user_id || null,
-                type: interaction.type,
-                content: interaction.content
+                user_id: interaction.user_id || null
             }]);
 
         if (error) throw error;

@@ -79,3 +79,24 @@ export async function captureAndAnalyzeLeadsAction(userPrompt: string) {
 export async function analyzeProfileSingle(handle: string, bio: string, platform: string): Promise<AIAnalysisResult> {
     return await aiService.analyzeProfile(handle, bio, platform);
 }
+
+export async function captureSimilarLeadsAction(targetHandle: string) {
+    console.log("👯 Iniciando Busca por Similaridade para:", targetHandle);
+
+    // 1. Get Target Profile Info
+    const cleanHandle = targetHandle.replace('@', '');
+    const targetResults = await scraperService.searchLeads({ niche: `@${cleanHandle}` });
+
+    if (!targetResults || targetResults.length === 0) {
+        throw new Error("Perfil alvo não encontrado para análise de similaridade.");
+    }
+
+    const targetProfile = targetResults[0];
+
+    // 2. Generate Lookalike Filters
+    const lookalikeFilters = await aiService.generateFiltersFromProfile(targetProfile);
+    console.log("🧠 Filtros Lookalike gerados:", JSON.stringify(lookalikeFilters));
+
+    // 3. Search similar profiles
+    return await captureAndAnalyzeLeadsAction(lookalikeFilters.searchKeywords?.[0] || lookalikeFilters.niche || targetProfile.bio);
+}
