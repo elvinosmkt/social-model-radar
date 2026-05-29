@@ -2,6 +2,7 @@
 
 import { aiService, ScoutingFilters, AIAnalysisResult } from "@/services/ai-service";
 import { scraperService, ScrapedLead } from "@/services/scraper-service";
+import { supabase } from "@/lib/supabase/client";
 
 export async function processScoutingPromptAction(userPrompt: string): Promise<ScoutingFilters> {
     return await aiService.processScoutingPrompt(userPrompt);
@@ -23,17 +24,35 @@ export async function captureAndAnalyzeLeadsAction(userPrompt: string, limit: nu
         }
     } catch (error) {
         console.warn("⚠️ AI processing failed:", error);
-        // Fallback to activeFilters already initialized with niche: userPrompt, limit
     }
 
     // 2. Discover leads (Real Scraper)
-    // O scraper agora filtra por seguidores, remove privados, e limita a {limit} resultados dinamicamente
     const leads = await scraperService.searchLeads(activeFilters);
     console.log(`📊 Scraper retornou ${leads.length} leads já filtrados`);
 
-    // 3. Analyze each lead with AI (with error handling for AI quota)
+    // 3. Database Anti-duplicity Check
+    let existingHandles = new Set<string>();
+    try {
+        const handles = leads.map(l => l.handle.toLowerCase());
+        if (handles.length > 0) {
+            const { data: masterLeads } = await supabase
+                .from('leads_master')
+                .select('handle')
+                .in('handle', handles);
+            if (masterLeads) {
+                existingHandles = new Set(masterLeads.map(l => l.handle.toLowerCase()));
+            }
+        }
+    } catch (e) {
+        console.warn("⚠️ Anti-duplicity database query bypassed:", e);
+    }
+
+    // 4. Analyze each lead with AI
     const analyzedResults = await Promise.all(
         leads.map(async (lead: ScrapedLead) => {
+            const handleLower = lead.handle.toLowerCase();
+            const isDuplicate = existingHandles.has(handleLower);
+
             let ai_niche = activeFilters.niche || "Pendente";
             let ai_score = 50;
             let ai_summary = "Análise indisponível (verifique créditos da API)";
@@ -41,7 +60,6 @@ export async function captureAndAnalyzeLeadsAction(userPrompt: string, limit: nu
             let ai_characteristics: string[] = [];
 
             try {
-                // Passar mais contexto para a IA gerar análises mais precisas
                 const enrichedBio = [
                     lead.bio,
                     lead.followers ? `Seguidores: ${lead.followers}` : '',
@@ -56,7 +74,7 @@ export async function captureAndAnalyzeLeadsAction(userPrompt: string, limit: nu
                 age_range = analysis.age_range;
                 ai_characteristics = analysis.characteristics || [];
             } catch (e) {
-                // Silently fail AI analysis and keep defaults
+                // Silently fail AI analysis
             }
 
             return {
@@ -65,17 +83,22 @@ export async function captureAndAnalyzeLeadsAction(userPrompt: string, limit: nu
                 ai_niche,
                 ai_summary,
                 age_range,
-                ai_characteristics
+                ai_characteristics,
+                isDuplicate
             };
         })
     );
 
-    // 4. Ordenar por AI score (perfis brasileiros e relevantes primeiro)
+    // 5. Ordenar por AI score
     const sortedResults = analyzedResults.sort((a, b) => b.ai_score - a.ai_score);
+
+    // Calculate actual credits consumed (only new/non-duplicate leads)
+    const creditsConsumed = leads.filter(l => !existingHandles.has(l.handle.toLowerCase())).length;
 
     return {
         filters: activeFilters,
-        results: sortedResults
+        results: sortedResults,
+        creditsConsumed
     };
 }
 
@@ -118,9 +141,29 @@ export async function captureSimilarLeadsAction(targetHandle: string, limit: num
         return leadHandle !== cleanHandle;
     });
 
-    // 5. Analyze each lead with AI
+    // 5. Database Anti-duplicity Check
+    let existingHandles = new Set<string>();
+    try {
+        const handles = filteredLeads.map(l => l.handle.toLowerCase());
+        if (handles.length > 0) {
+            const { data: masterLeads } = await supabase
+                .from('leads_master')
+                .select('handle')
+                .in('handle', handles);
+            if (masterLeads) {
+                existingHandles = new Set(masterLeads.map(l => l.handle.toLowerCase()));
+            }
+        }
+    } catch (e) {
+        console.warn("⚠️ Anti-duplicity database query bypassed:", e);
+    }
+
+    // 6. Analyze each lead with AI
     const analyzedResults = await Promise.all(
         filteredLeads.map(async (lead: ScrapedLead) => {
+            const handleLower = lead.handle.toLowerCase();
+            const isDuplicate = existingHandles.has(handleLower);
+
             let ai_niche = activeFilters.niche || "Pendente";
             let ai_score = 50;
             let ai_summary = "Análise Lookalike indisponível";
@@ -152,16 +195,21 @@ export async function captureSimilarLeadsAction(targetHandle: string, limit: num
                 ai_niche,
                 ai_summary,
                 age_range,
-                ai_characteristics
+                ai_characteristics,
+                isDuplicate
             };
         })
     );
 
-    // 6. Sort by AI score
+    // 7. Sort by AI score
     const sortedResults = analyzedResults.sort((a, b) => b.ai_score - a.ai_score);
+
+    // Calculate actual credits consumed (only new/non-duplicate leads)
+    const creditsConsumed = filteredLeads.filter(l => !existingHandles.has(l.handle.toLowerCase())).length;
 
     return {
         filters: activeFilters,
-        results: sortedResults
+        results: sortedResults,
+        creditsConsumed
     };
 }

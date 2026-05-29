@@ -19,6 +19,7 @@ import { Lead, leadService, Interaction } from "@/services/lead-service";
 import { LeadDetails } from "@/components/leads/LeadDetails";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { AnimatePresence } from "framer-motion";
+import { useAuth } from "@/lib/context/AuthContext";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
     new: { label: "Novo", color: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
@@ -31,6 +32,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 export default function LeadsPage() {
+    const { user } = useAuth();
     const [leads, setLeads] = useState<Lead[]>([]);
     const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -40,6 +42,7 @@ export default function LeadsPage() {
     const [statusFilter, setStatusFilter] = useState<string>("all");
 
     const fetchLeads = useCallback(async () => {
+        if (!user) return;
         try {
             const data = await leadService.getLeads();
             setLeads(data);
@@ -48,11 +51,13 @@ export default function LeadsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => {
-        fetchLeads();
-    }, [fetchLeads]);
+        if (user) {
+            fetchLeads();
+        }
+    }, [user, fetchLeads]);
 
     // Apply filters locally
     useEffect(() => {

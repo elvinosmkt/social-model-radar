@@ -70,7 +70,7 @@ export function Sidebar() {
 
     const [role, setRole] = useState<"admin" | "vendedor" | "webscouter">("webscouter");
     const [userName, setUserName] = useState("Usuário");
-    const [userCredits, setUserCredits] = useState({ used: 0, total: 100 });
+    const [userCredits, setUserCredits] = useState({ used: 0, total: 100, balance: 100 });
 
     useEffect(() => {
         if (user) {
@@ -99,7 +99,8 @@ export function Sidebar() {
             creditService.getUserCredits(user.id).then(c => {
                 setUserCredits({
                     used: c.total_consumed,
-                    total: c.total_allocated
+                    total: c.total_allocated,
+                    balance: c.balance
                 });
             });
         }
@@ -120,8 +121,8 @@ export function Sidebar() {
 
     // Créditos — só para vendedor e webscouter
     const creditData = {
-        vendedor:    { used: userCredits.used,  total: userCredits.total, label: "Créditos alocados" },
-        webscouter:  { used: userCredits.used,  total: userCredits.total,  label: "Meus créditos"  },
+        vendedor:    { balance: userCredits.balance,  total: userCredits.total, label: "Créditos livres" },
+        webscouter:  { balance: userCredits.balance,  total: userCredits.total,  label: "Meus créditos"  },
         admin:       null,
     }[role];
 
@@ -163,13 +164,13 @@ export function Sidebar() {
                     <div className="px-2 space-y-1">
                         <div className="flex justify-between text-[10px]">
                             <span className="text-text-secondary font-medium">{creditData.label}</span>
-                            <span className={cn("font-bold", (creditData.total - creditData.used) < creditData.total * 0.15 ? "text-amber-400" : "text-primary")}>
-                                {(creditData.total - creditData.used).toLocaleString('pt-BR')} / {creditData.total.toLocaleString('pt-BR')}
+                            <span className={cn("font-bold", creditData.balance < creditData.total * 0.15 ? "text-amber-400" : "text-primary")}>
+                                {creditData.balance.toLocaleString('pt-BR')} / {creditData.total.toLocaleString('pt-BR')}
                             </span>
                         </div>
                         <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                            <div className={cn("h-full rounded-full", (creditData.used/creditData.total) > 0.85 ? "bg-amber-400" : "bg-primary")}
-                                style={{ width: `${(creditData.used/creditData.total)*100}%` }} />
+                            <div className={cn("h-full rounded-full", (1 - creditData.balance/creditData.total) > 0.85 ? "bg-amber-400" : "bg-primary")}
+                                style={{ width: `${(creditData.balance/creditData.total)*100}%` }} />
                         </div>
                     </div>
                 )}

@@ -9,20 +9,18 @@ interface ROITrackingProps {
     qualCount: number;
     approachedCount: number;
     convertedCount: number;
-    isDemoMode?: boolean;
 }
 
 export function ROITracking({
     leadsCount,
     qualCount,
     approachedCount,
-    convertedCount,
-    isDemoMode = false
+    convertedCount
 }: ROITrackingProps) {
-    const displayLeads = isDemoMode ? 1284 : leadsCount;
-    const displayQual = isDemoMode ? 856 : qualCount;
-    const displayApproached = isDemoMode ? 456 : approachedCount;
-    const displayConverted = isDemoMode ? 24 : convertedCount;
+    const displayLeads = leadsCount;
+    const displayQual = qualCount;
+    const displayApproached = approachedCount;
+    const displayConverted = convertedCount;
 
     const funnelSteps = [
         { label: "Captados", value: displayLeads, color: "bg-white/10" },
@@ -32,11 +30,11 @@ export function ROITracking({
     ];
 
     // ROI dynamically calculated
-    const cpl = isDemoMode ? "R$ 0,42" : displayLeads > 0 ? "R$ 0,35" : "R$ 0,00";
+    const cpl = displayLeads > 0 ? "R$ 0,35" : "R$ 0,00";
     const ltv = displayConverted * 12500;
     const efficiency = displayLeads > 0 ? Math.round((displayQual / displayLeads) * 100) : 0;
-    const finalEfficiency = isDemoMode ? 84 : efficiency;
-    const hoursSaved = isDemoMode ? 32 : Math.round(displayLeads * 1.5);
+    const finalEfficiency = efficiency;
+    const hoursSaved = Math.round(displayLeads * 1.5);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

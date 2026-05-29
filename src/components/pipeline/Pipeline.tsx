@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { Lead, leadService, Interaction } from "@/services/lead-service";
 import { LeadDetails } from "@/components/leads/LeadDetails";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/lib/context/AuthContext";
 
 const COLUMNS: { id: Lead['status']; title: string; colorDot: string; colorBg: string; colorBorder: string }[] = [
     { id: "new",            title: "Novos",         colorDot: "bg-blue-400",    colorBg: "bg-blue-400/8",    colorBorder: "border-blue-400/20" },
@@ -75,6 +76,7 @@ function StatusDropdown({ currentStatus, onChange }: { currentStatus: Lead['stat
 }
 
 export function Pipeline() {
+    const { user } = useAuth();
     const [leads, setLeads] = useState<Lead[]>([]);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [interactions, setInteractions] = useState<Interaction[]>([]);
@@ -85,6 +87,7 @@ export function Pipeline() {
     const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
     const fetchLeads = useCallback(async () => {
+        if (!user) return;
         try {
             const data = await leadService.getLeads();
             setLeads(data);
@@ -93,11 +96,13 @@ export function Pipeline() {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => {
-        fetchLeads();
-    }, [fetchLeads]);
+        if (user) {
+            fetchLeads();
+        }
+    }, [user, fetchLeads]);
 
     const handleDragStart = (e: React.DragEvent, leadId: string) => {
         setDraggingId(leadId);

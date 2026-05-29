@@ -34,7 +34,7 @@ import { useEffect } from "react";
 
 const COUNTRIES = ["Brasil", "Portugal", "EUA", "Argentina", "México", "Espanha", "Colômbia"];
 const LANGUAGES = ["Português", "Inglês", "Espanhol", "Francês", "Italiano"];
-const NICHES    = ["Beleza / Skincare", "Moda / Fashion", "Fitness / Saúde", "Lifestyle", "Luxo / Premium", "Culinária", "Viagem", "Educação", "Maternidade", "Sustentabilidade", "Tecnologia", "Outro"];
+const NICHES = ["Beleza / Skincare", "Moda / Fashion", "Fitness / Saúde", "Lifestyle", "Luxo / Premium", "Culinária", "Viagem", "Educação", "Maternidade", "Sustentabilidade", "Tecnologia", "Outro"];
 
 function formatNumber(num: number | null | undefined): string {
     if (num === null || num === undefined) return '0';
@@ -46,12 +46,12 @@ function formatNumber(num: number | null | undefined): string {
 export default function CapturePage() {
     const { user } = useAuth();
     const [mode, setMode] = useState<'prompt' | 'lookalike'>('prompt');
-    const [prompt, setPrompt]         = useState("");
-    const [quantity, setQuantity]     = useState(10);
+    const [prompt, setPrompt] = useState("");
+    const [quantity, setQuantity] = useState(10);
     const [showFilters, setShowFilters] = useState(false);
-    const [showQty, setShowQty]       = useState(false);
+    const [showQty, setShowQty] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
-    const [balance, setBalance]       = useState(380);
+    const [balance, setBalance] = useState(380);
 
     // Results states
     const [results, setResults] = useState<any[]>([]);
@@ -69,10 +69,10 @@ export default function CapturePage() {
     }, [user]);
 
     // Advanced filters from partner
-    const [country,  setCountry]  = useState("Brasil");
+    const [country, setCountry] = useState("Brasil");
     const [language, setLanguage] = useState("Português");
-    const [niche,    setNiche]    = useState("");
-    const [product,  setProduct]  = useState("");
+    const [niche, setNiche] = useState("");
+    const [product, setProduct] = useState("");
     const [lookalike, setLookalike] = useState("");
 
     // Custom glowing notifications modal
@@ -145,7 +145,15 @@ export default function CapturePage() {
             });
         } catch (error: any) {
             console.error("Failed to add lead:", error);
-            if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate')) {
+            if (error.code === 'DUPLICATE_LEAD') {
+                showNotification('warning', 'Bloqueio Anti-Duplicidade', error.message);
+                setAddedIds(prev => new Set([...prev, lead.handle]));
+                setSelectedToExport(prev => {
+                    const next = new Set(prev);
+                    next.delete(lead.handle);
+                    return next;
+                });
+            } else if (error.code === '23505' || error.message?.includes('unique') || error.message?.includes('duplicate')) {
                 showNotification('warning', 'Perfil Duplicado', `O perfil ${lead.handle} já está cadastrado no seu pipeline.`);
                 setAddedIds(prev => new Set([...prev, lead.handle]));
                 setSelectedToExport(prev => {
@@ -217,7 +225,7 @@ export default function CapturePage() {
     // Real search handler combining both modes
     const handleSearch = async (e?: React.FormEvent | React.MouseEvent) => {
         if (e) e.preventDefault();
-        
+
         const searchQuery = mode === 'prompt' ? prompt : lookalike;
         if (!searchQuery.trim()) return;
 
@@ -233,24 +241,24 @@ export default function CapturePage() {
 
         try {
             if (mode === 'prompt') {
-                const { filters: extractedFilters, results: searchResults } = await captureAndAnalyzeLeadsAction(searchQuery, quantity);
+                const { filters: extractedFilters, results: searchResults, creditsConsumed } = await captureAndAnalyzeLeadsAction(searchQuery, quantity);
                 setResults(searchResults);
                 setFilters(extractedFilters);
 
-                // Consume credits from database dynamically
-                if (user && searchResults.length > 0) {
-                    await creditService.consumeCredits(user.id, quantity);
-                    setBalance(prev => Math.max(0, prev - quantity));
+                // Consume credits from database dynamically (only for non-duplicate leads!)
+                if (user && searchResults.length > 0 && creditsConsumed > 0) {
+                    await creditService.consumeCredits(user.id, creditsConsumed);
+                    setBalance(prev => Math.max(0, prev - creditsConsumed));
                 }
             } else {
-                const searchResults = await captureSimilarLeadsAction(searchQuery, quantity);
-                setResults(searchResults.results);
-                setFilters(searchResults.filters);
+                const { results: searchResults, filters: extractedFilters, creditsConsumed } = await captureSimilarLeadsAction(searchQuery, quantity);
+                setResults(searchResults);
+                setFilters(extractedFilters);
 
-                // Consume credits from database dynamically
-                if (user && searchResults.results.length > 0) {
-                    await creditService.consumeCredits(user.id, quantity);
-                    setBalance(prev => Math.max(0, prev - quantity));
+                // Consume credits from database dynamically (only for non-duplicate leads!)
+                if (user && searchResults.length > 0 && creditsConsumed > 0) {
+                    await creditService.consumeCredits(user.id, creditsConsumed);
+                    setBalance(prev => Math.max(0, prev - creditsConsumed));
                 }
             }
         } catch (error: any) {
@@ -264,7 +272,7 @@ export default function CapturePage() {
     const buildAutoPrompt = () => {
         const parts = [];
         if (product) parts.push(`produto: "${product}"`);
-        if (niche)   parts.push(`nicho: ${niche}`);
+        if (niche) parts.push(`nicho: ${niche}`);
         if (country) parts.push(`país: ${country}`);
         if (language && language !== "Português") parts.push(`idioma: ${language}`);
         return parts.join(", ");
@@ -278,12 +286,12 @@ export default function CapturePage() {
             <div className="px-4 md:px-8 mt-5 flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex gap-2">
                     {([{ id: 'prompt', label: 'Radar AI', icon: Sparkles }, { id: 'lookalike', label: 'Lookalike', icon: Zap }] as const).map(m => (
-                        <button 
-                            key={m.id} 
-                            onClick={() => { 
-                                setMode(m.id); 
-                                setResults([]); 
-                                setFilters(null); 
+                        <button
+                            key={m.id}
+                            onClick={() => {
+                                setMode(m.id);
+                                setResults([]);
+                                setFilters(null);
                                 setSelectedToExport(new Set());
                             }}
                             className={cn("flex items-center gap-2 px-4 md:px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all cursor-pointer",
@@ -296,7 +304,7 @@ export default function CapturePage() {
                     ))}
                 </div>
                 <div className="flex gap-2">
-                    <button 
+                    <button
                         onClick={() => { setShowFilters(!showFilters); setShowQty(false); }}
                         className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer",
                             showFilters ? "bg-primary/10 border-primary/30 text-primary" : "bg-white/5 border-white/5 text-text-secondary hover:bg-white/10"
@@ -308,7 +316,7 @@ export default function CapturePage() {
                             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                         )}
                     </button>
-                    <button 
+                    <button
                         onClick={() => { setShowQty(!showQty); setShowFilters(false); }}
                         className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer",
                             showQty ? "bg-primary/10 border-primary/30 text-primary" : "bg-white/5 border-white/5 text-text-secondary hover:bg-white/10"
@@ -327,8 +335,8 @@ export default function CapturePage() {
                         <div className="mx-4 md:mx-8 mt-4 p-5 glass-effect rounded-2xl border border-white/5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary flex items-center gap-1"><Globe className="w-3 h-3" /> País</label>
-                                <select 
-                                    value={country} 
+                                <select
+                                    value={country}
                                     onChange={e => setCountry(e.target.value)}
                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/40 transition-all cursor-pointer text-white"
                                 >
@@ -337,8 +345,8 @@ export default function CapturePage() {
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Idioma</label>
-                                <select 
-                                    value={language} 
+                                <select
+                                    value={language}
                                     onChange={e => setLanguage(e.target.value)}
                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/40 transition-all cursor-pointer text-white"
                                 >
@@ -347,8 +355,8 @@ export default function CapturePage() {
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Nicho</label>
-                                <select 
-                                    value={niche} 
+                                <select
+                                    value={niche}
                                     onChange={e => setNiche(e.target.value)}
                                     className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/40 transition-all cursor-pointer text-white"
                                 >
@@ -358,11 +366,11 @@ export default function CapturePage() {
                             </div>
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Produto / Oferta</label>
-                                <input 
-                                    value={product} 
+                                <input
+                                    value={product}
                                     onChange={e => setProduct(e.target.value)}
                                     placeholder="Ex: Curso de Modelo"
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/40 transition-all text-white placeholder:text-text-secondary/30" 
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-primary/40 transition-all text-white placeholder:text-text-secondary/30"
                                 />
                             </div>
                             {/* Auto prompt generator */}
@@ -370,12 +378,12 @@ export default function CapturePage() {
                                 <div className="col-span-full flex items-center gap-2 p-3 rounded-xl bg-primary/5 border border-primary/10">
                                     <Sparkles className="w-4 h-4 text-primary flex-shrink-0" />
                                     <p className="text-xs text-text-secondary flex-1">Prompt auto-gerado: <span className="text-primary font-medium">{buildAutoPrompt()}</span></p>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             setPrompt(buildAutoPrompt());
                                             setMode('prompt');
                                             showNotification('success', 'Prompt Aplicado', 'O prompt gerado pelos filtros foi copiado para a barra de busca.');
-                                        }} 
+                                        }}
                                         className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
                                     >
                                         Usar
@@ -396,17 +404,17 @@ export default function CapturePage() {
                                 <p className="text-sm font-bold flex items-center gap-2"><Users className="w-4 h-4 text-primary" /> Limite de Resultados</p>
                                 <span className="text-3xl font-outfit font-bold text-primary">{quantity}</span>
                             </div>
-                            <input 
-                                type="range" 
-                                min={5} 
-                                max={50} 
-                                step={5} 
-                                value={quantity} 
+                            <input
+                                type="range"
+                                min={5}
+                                max={50}
+                                step={5}
+                                value={quantity}
                                 onChange={e => setQuantity(Number(e.target.value))}
-                                className="w-full accent-primary cursor-pointer h-1 bg-white/10 rounded-lg appearance-none" 
+                                className="w-full accent-primary cursor-pointer h-1 bg-white/10 rounded-lg appearance-none"
                             />
                             <div className="flex justify-between text-[10px] text-text-secondary font-bold mt-2">
-                                {[5,10,15,20,25,30,35,40,45,50].map(v => <span key={v}>{v}</span>)}
+                                {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50].map(v => <span key={v}>{v}</span>)}
                             </div>
                             <p className="text-[11px] text-text-secondary mt-3">
                                 Custo de busca: <span className="text-primary font-bold">{quantity} créditos</span> · Sua conta tem <span className="font-bold text-white">{balance} disponíveis</span>
@@ -469,8 +477,8 @@ export default function CapturePage() {
                             <div className="p-3 rounded-xl bg-amber-400/5 border border-amber-400/15">
                                 <p className="text-xs text-amber-400 font-medium">⭐ A IA extrairá nicho, engajamento, visual e biografia do perfil de referência para moldar os critérios de busca.</p>
                             </div>
-                            <button 
-                                onClick={handleSearch} 
+                            <button
+                                onClick={handleSearch}
                                 disabled={isSearching || !lookalike.trim()}
                                 className="w-full py-3 rounded-xl bg-primary text-black font-bold text-sm hover:opacity-90 disabled:opacity-40 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 cursor-pointer"
                             >
@@ -507,7 +515,7 @@ export default function CapturePage() {
                         </div>
                         <div className="space-y-1">
                             <h3 className="text-lg font-outfit font-bold text-white">Radar AI em Ação...</h3>
-                            <p className="text-sm text-text-secondary max-w-sm">Vasculhando bases e analisando perfis com inteligência artificial no Instagram. Isso pode levar de 5 a 15 segundos.</p>
+                            <p className="text-sm text-text-secondary max-w-sm">Vasculhando bases e analisando perfis com inteligência artificial no Instagram. Isso pode levar de 1 a 3 minutos.</p>
                         </div>
                     </div>
                 )}
@@ -519,7 +527,7 @@ export default function CapturePage() {
                             <div className="absolute inset-0 rounded-full bg-primary/5 animate-[ping_3s_infinite] opacity-35"></div>
                             <div className="absolute inset-2 rounded-full bg-primary/10 animate-[ping_2s_infinite] opacity-50"></div>
                             <div className="absolute inset-4 rounded-full border border-primary/20 animate-pulse"></div>
-                            
+
                             <div className="relative w-16 h-16 rounded-full bg-card border border-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(201,160,92,0.2)]">
                                 <Target className="w-8 h-8 text-primary animate-pulse" />
                             </div>
@@ -548,14 +556,14 @@ export default function CapturePage() {
                                 </p>
                             </div>
                             <div className="flex items-center justify-between sm:justify-end gap-6">
-                                <button 
-                                    onClick={toggleSelectAll} 
+                                <button
+                                    onClick={toggleSelectAll}
                                     className="text-xs text-text-secondary hover:text-primary transition-colors font-bold uppercase tracking-wider cursor-pointer"
                                 >
                                     {allSelected ? "Desmarcar todos" : "Selecionar todos"}
                                 </button>
                                 {selectedToExport.size > 0 && (
-                                    <button 
+                                    <button
                                         onClick={handleExportToPipeline}
                                         className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-black text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-primary/20 cursor-pointer animate-scale-up"
                                     >
@@ -569,7 +577,7 @@ export default function CapturePage() {
                         {/* Combined Premium Cards Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
                             {results.slice(0, quantity).map((res, i) => {
-                                const added   = addedIds.has(res.handle);
+                                const added = addedIds.has(res.handle);
                                 const checked = selectedToExport.has(res.handle);
 
                                 return (
@@ -582,15 +590,15 @@ export default function CapturePage() {
                                         className={cn(
                                             "relative overflow-hidden backdrop-blur-md border rounded-[2rem] p-5 md:p-6 group hover:translate-y-[-6px] transition-all duration-500 cursor-pointer flex flex-col justify-between",
                                             checked ? "border-primary/40 bg-primary/[0.03] shadow-[0_20px_50px_rgba(201,160,92,0.1)]" :
-                                            added   ? "border-success/30 bg-success/[0.01]" :
-                                            "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04] hover:border-primary/20 hover:shadow-[0_20px_50px_rgba(201,160,92,0.15)]"
+                                                added ? "border-success/30 bg-success/[0.01]" :
+                                                    "bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04] hover:border-primary/20 hover:shadow-[0_20px_50px_rgba(201,160,92,0.15)]"
                                         )}
                                     >
                                         {/* Glowing radial ambient background effect */}
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-purple-500/10 rounded-full blur-3xl opacity-50 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
                                         {/* Individual Checkbox (disabled if already added) */}
-                                        <button 
+                                        <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (!added) toggleSelect(res.handle);
@@ -632,7 +640,7 @@ export default function CapturePage() {
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <div className="flex items-center gap-1.5">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
                                                             <p className="font-bold text-sm text-white group-hover:text-primary transition-colors duration-300">
                                                                 {res.handle.startsWith('@') ? res.handle : `@${res.handle}`}
                                                             </p>
@@ -641,6 +649,11 @@ export default function CapturePage() {
                                                             )}
                                                             {res.is_private && (
                                                                 <Lock className="w-3 h-3 text-text-secondary/60" />
+                                                            )}
+                                                            {res.isDuplicate && (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-400 border border-amber-400/30 text-[9px] font-extrabold uppercase tracking-wider shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                                                                    Da Base
+                                                                </span>
                                                             )}
                                                         </div>
                                                         <p className="text-[11px] text-text-secondary/70 truncate max-w-[150px] font-medium">
@@ -777,8 +790,8 @@ export default function CapturePage() {
                                                 disabled={added}
                                                 className={cn(
                                                     "w-full py-2.5 rounded-2xl text-xs font-extrabold transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer",
-                                                    added 
-                                                        ? "bg-success/10 text-success border border-success/20 cursor-default" 
+                                                    added
+                                                        ? "bg-success/10 text-success border border-success/20 cursor-default"
                                                         : "bg-white/[0.03] border border-white/[0.05] text-white hover:bg-gradient-to-r hover:from-primary hover:to-primary-light hover:text-black hover:border-transparent hover:shadow-[0_0_15px_rgba(201,160,92,0.35)] group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-primary-light group-hover:text-black group-hover:border-transparent"
                                                 )}
                                             >
@@ -807,7 +820,7 @@ export default function CapturePage() {
             {modal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     {/* Backdrop blur overlay */}
-                    <div 
+                    <div
                         onClick={() => setModal(prev => ({ ...prev, isOpen: false }))}
                         className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-all duration-300"
                     />
@@ -824,10 +837,10 @@ export default function CapturePage() {
                         <div className="flex justify-center">
                             <div className={cn(
                                 "w-16 h-16 rounded-2xl flex items-center justify-center border shadow-lg",
-                                modal.type === 'success' 
-                                    ? 'bg-success/10 border-success/20 text-success shadow-success/10' 
-                                    : modal.type === 'warning' 
-                                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 shadow-amber-500/10' 
+                                modal.type === 'success'
+                                    ? 'bg-success/10 border-success/20 text-success shadow-success/10'
+                                    : modal.type === 'warning'
+                                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 shadow-amber-500/10'
                                         : 'bg-danger/10 border-danger/20 text-danger shadow-danger/10'
                             )}>
                                 {modal.type === 'success' && <CheckCircle2 className="w-8 h-8" />}

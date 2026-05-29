@@ -6,7 +6,7 @@ import {
     Users, TrendingUp, Target, Shield, Plus,
     AlertTriangle, Award, ArrowUpRight, ArrowDownRight,
     Search, ChevronRight, Coins, Briefcase, Zap,
-    CheckCircle2, Loader2
+    CheckCircle2, Loader2, AlertCircle, Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -61,6 +61,7 @@ function NewVendedorForm({ onClose, onSuccess, remainingCredits }: NewVendedorFo
     const [leadLimit, setLeadLimit] = useState(500);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [isSuccess, setIsSuccess] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -82,63 +83,126 @@ function NewVendedorForm({ onClose, onSuccess, remainingCredits }: NewVendedorFo
                 initialCredits,
                 leadLimit
             });
-            onSuccess();
+            setIsSuccess(true);
+            setTimeout(() => {
+                onSuccess();
+            }, 2200);
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Erro ao registrar vendedor no banco.");
-        } finally {
             setLoading(false);
         }
     };
 
-    return (
-        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-            className="glass-effect rounded-2xl p-6 border border-primary/20 space-y-5">
-            <div className="flex items-center justify-between">
-                <h3 className="font-outfit font-bold flex items-center gap-2"><Briefcase className="w-4 h-4 text-primary" />Novo Vendedor</h3>
-                <button onClick={onClose} className="text-xs text-text-secondary hover:text-foreground cursor-pointer">Cancelar</button>
+    if (isSuccess) {
+        return (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+                {/* Backdrop glass overlay */}
+                <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }} 
+                    className="absolute inset-0 bg-black/85 backdrop-blur-md" 
+                />
+                <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: 15 }} 
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                    transition={{ type: "spring", duration: 0.5 }}
+                    className="relative w-full max-w-md bg-card-glass border border-white/10 rounded-3xl p-10 shadow-2xl backdrop-blur-3xl flex flex-col items-center justify-center text-center space-y-6 z-10"
+                >
+                    <div className="w-16 h-16 rounded-full bg-success/15 border border-success/35 flex items-center justify-center shadow-[0_0_35px_rgba(48,209,88,0.25)]">
+                        <CheckCircle2 className="w-8 h-8 text-success animate-pulse" />
+                    </div>
+                    <div className="space-y-2.5">
+                        <h3 className="text-2xl font-outfit font-bold text-white tracking-tight">Cadastro Concluído!</h3>
+                        <p className="text-sm text-text-secondary leading-relaxed">
+                            O vendedor <span className="text-primary font-bold">{name}</span> foi registrado com sucesso e está pronto para gerenciar sua equipe.
+                        </p>
+                    </div>
+                </motion.div>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Nome Completo</label>
-                        <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Ex: Maria Silva"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/40 transition-all text-white font-medium" />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">E-mail</label>
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="email@dws.com"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/40 transition-all text-white font-medium" />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Senha Temporária</label>
-                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/40 transition-all text-white font-medium" />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Nome da Equipe</label>
-                        <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} required placeholder="Ex: Time Delta"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/40 transition-all text-white font-medium" />
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Créditos Iniciais</label>
-                        <input type="number" value={initialCredits} onChange={e => setInitialCredits(Number(e.target.value))} min={100}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/40 transition-all text-white font-medium" />
-                        <p className="text-[9px] text-text-secondary">Disponível: {remainingCredits.toLocaleString('pt-BR')} créditos</p>
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Limite de Leads</label>
-                        <input type="number" value={leadLimit} onChange={e => setLeadLimit(Number(e.target.value))} min={50}
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/40 transition-all text-white font-medium" />
-                    </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 overflow-y-auto">
+            {/* Backdrop glass overlay */}
+            <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                onClick={onClose}
+                className="absolute inset-0 bg-black/80 backdrop-blur-md" 
+            />
+            
+            {/* Modal Card */}
+            <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 15 }} 
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ type: "spring", duration: 0.5 }}
+                className="relative w-full max-w-lg bg-card-glass border border-white/10 rounded-3xl p-8 shadow-2xl backdrop-blur-3xl space-y-6 z-10"
+            >
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <h3 className="font-outfit text-xl font-bold flex items-center gap-2.5 text-white">
+                        <Briefcase className="w-5 h-5 text-primary" /> Novo Vendedor
+                    </h3>
+                    <button 
+                        onClick={onClose} 
+                        className="px-3 py-1.5 rounded-xl hover:bg-white/5 text-text-secondary hover:text-white transition-colors cursor-pointer text-xs font-bold border border-white/5"
+                    >
+                        Fechar
+                    </button>
                 </div>
-                {error && <p className="text-xs text-danger font-medium">{error}</p>}
-                <button type="submit" disabled={loading}
-                    className="w-full py-3 rounded-xl bg-primary text-black font-bold text-sm hover:opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 cursor-pointer">
-                    {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Registrando...</> : "Criar Vendedor"}
-                </button>
-            </form>
-        </motion.div>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Nome Completo</label>
+                            <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Ex: Maria Silva"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/45 transition-all text-white font-medium shadow-inner" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">E-mail</label>
+                            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="email@dws.com"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/45 transition-all text-white font-medium shadow-inner" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Senha Temporária</label>
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/45 transition-all text-white font-medium shadow-inner" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Nome da Equipe</label>
+                            <input type="text" value={teamName} onChange={e => setTeamName(e.target.value)} required placeholder="Ex: Time Delta"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/45 transition-all text-white font-medium shadow-inner" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Créditos Iniciais</label>
+                            <input type="number" value={initialCredits} onChange={e => setInitialCredits(Number(e.target.value))} min={100}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/45 transition-all text-white font-bold shadow-inner" />
+                            <p className="text-[9px] text-text-secondary font-medium">Disponível: <span className="text-primary font-bold">{remainingCredits.toLocaleString('pt-BR')}</span> créditos</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">Limite de Leads</label>
+                            <input type="number" value={leadLimit} onChange={e => setLeadLimit(Number(e.target.value))} min={50}
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/45 transition-all text-white font-bold shadow-inner" />
+                        </div>
+                    </div>
+                    {error && (
+                        <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/25 flex items-center gap-2.5 text-danger text-xs font-semibold">
+                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                            <span>{error}</span>
+                        </div>
+                    )}
+                    <button type="submit" disabled={loading}
+                        className="w-full py-4 rounded-xl bg-primary text-black font-extrabold text-sm hover:bg-primary-light disabled:opacity-50 transition-all shadow-lg shadow-primary/10 flex items-center justify-center gap-2 cursor-pointer relative overflow-hidden group">
+                        <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-white/0 via-white/20 to-white/0 skew-x-[-25deg] -translate-x-[150%] group-hover:translate-x-[250%] transition-transform duration-1000 ease-out" />
+                        {loading ? <><Loader2 className="w-4 h-4 animate-spin text-black" />Registrando...</> : "Criar Vendedor"}
+                    </button>
+                </form>
+            </motion.div>
+        </div>
     );
 }
 
@@ -148,11 +212,31 @@ export default function AdminPage() {
     const [showNewVendedor, setShowNewVendedor] = useState(false);
     const [search, setSearch] = useState("");
     const [expandedVendedor, setExpandedVendedor] = useState<string | null>(null);
+    const [sellerToDelete, setSellerToDelete] = useState<{ id: string, name: string } | null>(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState("");
+
+    const handleDeleteSeller = async () => {
+        if (!sellerToDelete) return;
+        setDeleteLoading(true);
+        setDeleteError("");
+
+        try {
+            await userService.deleteUser(sellerToDelete.id);
+            setSellerToDelete(null);
+            loadAdminData();
+        } catch (err: any) {
+            console.error(err);
+            setDeleteError(err.message || "Erro ao deletar vendedor.");
+        } finally {
+            setDeleteLoading(false);
+        }
+    };
 
     // Live state
     const [vendedores, setVendedores] = useState<any[]>([]);
     const [webscouters, setWebscouters] = useState<any[]>([]);
-    const [platformCredits, setPlatformCredits] = useState({ total: 10000, allocated: 4300, remaining: 5700 });
+    const [platformCredits, setPlatformCredits] = useState({ total: 10000, allocated: 0, remaining: 10000 });
     const [loading, setLoading] = useState(true);
 
     const loadAdminData = async () => {
@@ -163,7 +247,8 @@ export default function AdminPage() {
             setVendedores(sellersList);
             setWebscouters(scoutsList);
 
-            const allocated = sellersList.reduce((sum, s) => sum + s.creditsReceived, 0);
+            const isMock = sellersList.length > 0 && String(sellersList[0].id).startsWith('v');
+            const allocated = isMock ? 0 : sellersList.reduce((sum, s) => sum + s.creditsReceived, 0);
             const remaining = Math.max(0, 10000 - allocated);
             setPlatformCredits({
                 total: 10000,
@@ -359,9 +444,67 @@ export default function AdminPage() {
                                     onSuccess={() => {
                                         setShowNewVendedor(false);
                                         loadAdminData();
-                                        alert("Vendedor registrado com sucesso!");
                                     }}
                                 />
+                            )}
+                        </AnimatePresence>
+
+                        <AnimatePresence>
+                            {sellerToDelete && (
+                                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-6 overflow-y-auto">
+                                    {/* Backdrop */}
+                                    <motion.div 
+                                        initial={{ opacity: 0 }} 
+                                        animate={{ opacity: 1 }} 
+                                        exit={{ opacity: 0 }} 
+                                        onClick={() => setSellerToDelete(null)}
+                                        className="absolute inset-0 bg-black/80 backdrop-blur-md" 
+                                    />
+                                    
+                                    {/* Confirmation Card */}
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.95, y: 15 }} 
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                                        transition={{ type: "spring", duration: 0.5 }}
+                                        className="relative w-full max-w-md bg-card-glass border border-white/10 rounded-3xl p-8 shadow-2xl backdrop-blur-3xl space-y-6 z-10 text-center"
+                                    >
+                                        <div className="w-14 h-14 rounded-full bg-danger/15 border border-danger/35 flex items-center justify-center mx-auto shadow-[0_0_25px_rgba(255,69,58,0.15)]">
+                                            <AlertCircle className="w-6 h-6 text-danger" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <h3 className="font-outfit text-xl font-bold text-white">Excluir Vendedor?</h3>
+                                            <p className="text-xs text-text-secondary leading-relaxed">
+                                                Tem certeza que deseja deletar permanentemente <span className="text-white font-bold">{sellerToDelete.name}</span>? 
+                                                Esta ação excluirá permanentemente a equipe, os webscouters vinculados e todos os créditos distribuídos. Esta ação é irreversível.
+                                            </p>
+                                        </div>
+
+                                        {deleteError && (
+                                            <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/25 flex items-center gap-2.5 text-danger text-xs font-semibold text-left">
+                                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                                <span>{deleteError}</span>
+                                            </div>
+                                        )}
+
+                                        <div className="flex gap-3 pt-2">
+                                            <button 
+                                                onClick={() => setSellerToDelete(null)}
+                                                disabled={deleteLoading}
+                                                className="flex-1 py-3 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all font-bold text-xs cursor-pointer disabled:opacity-50"
+                                            >
+                                                Cancelar
+                                            </button>
+                                            <button 
+                                                onClick={handleDeleteSeller}
+                                                disabled={deleteLoading}
+                                                className="flex-1 py-3 rounded-xl bg-danger text-white hover:bg-danger-light transition-all font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-danger/20 disabled:opacity-50"
+                                            >
+                                                {deleteLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Sim, Excluir"}
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                </div>
                             )}
                         </AnimatePresence>
 
@@ -397,10 +540,22 @@ export default function AdminPage() {
                                                         </div>
                                                     ))}
                                                 </div>
-                                                <button onClick={() => setExpandedVendedor(isExpanded ? null : v.id)}
-                                                    className="p-2 hover:bg-white/10 rounded-xl transition-all flex-shrink-0 cursor-pointer">
-                                                    <ChevronRight className={cn("w-4 h-4 text-text-secondary transition-transform", isExpanded && "rotate-90")} />
-                                                </button>
+                                                 <div className="flex items-center gap-1">
+                                                     <button 
+                                                         onClick={(e) => {
+                                                             e.stopPropagation();
+                                                             setSellerToDelete({ id: v.id, name: v.name });
+                                                         }}
+                                                         className="p-2 hover:bg-danger/15 text-text-secondary hover:text-danger rounded-xl transition-all flex-shrink-0 cursor-pointer border border-transparent hover:border-danger/20"
+                                                         title="Excluir Vendedor"
+                                                     >
+                                                         <Trash2 className="w-4 h-4" />
+                                                     </button>
+                                                     <button onClick={() => setExpandedVendedor(isExpanded ? null : v.id)}
+                                                         className="p-2 hover:bg-white/10 rounded-xl transition-all flex-shrink-0 cursor-pointer">
+                                                         <ChevronRight className={cn("w-4 h-4 text-text-secondary transition-transform", isExpanded && "rotate-90")} />
+                                                     </button>
+                                                 </div>
                                             </div>
                                         </div>
 

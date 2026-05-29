@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 
 export interface UserProfile {
     id: string;
@@ -109,8 +110,8 @@ export const userService = {
                         .eq('user_id', vendedor.id)
                         .single();
 
-                    const creditsReceived = creditInfo?.total_allocated || 2000;
-                    const creditsUsed = creditInfo?.total_consumed || 0;
+                    const creditsReceived = creditInfo?.total_allocated ?? 0;
+                    const creditsUsed = creditInfo?.total_consumed ?? 0;
 
                     // Calculate distributed credits
                     let creditsDistributed = 0;
@@ -124,11 +125,20 @@ export const userService = {
 
                     const conversionRate = leadsApproached > 0 ? Number(((leadsConverted / leadsApproached) * 100).toFixed(1)) : 0;
 
+                    // Fetch team name dynamically instead of showing the UUID
+                    const { data: teamInfo } = await supabase
+                        .from('teams')
+                        .select('nome')
+                        .eq('vendedor_id', vendedor.id)
+                        .maybeSingle();
+
+                    const teamName = teamInfo?.nome || "Time de Scouting";
+
                     return {
                         id: vendedor.id,
                         name: vendedor.nome,
                         email: vendedor.email,
-                        team: vendedor.team_id || "Time de Scouting",
+                        team: teamName,
                         webscoutersCount: scoutIds.length,
                         creditsReceived,
                         creditsDistributed,
@@ -144,11 +154,10 @@ export const userService = {
                 })
             );
 
-            if (sellersWithStats.length === 0) return MOCK_VENDEDORES;
             return sellersWithStats;
         } catch (error) {
-            console.warn("⚠️ Supabase: Usando dados mockados para Vendedores.");
-            return MOCK_VENDEDORES;
+            console.warn("⚠️ Supabase: Falha ao buscar vendedores reais.", error);
+            return [];
         }
     },
 
@@ -182,8 +191,8 @@ export const userService = {
                         .eq('user_id', scout.id)
                         .single();
 
-                    const creditsReceived = creditInfo?.total_allocated || 500;
-                    const creditsUsed = creditInfo?.total_consumed || 0;
+                    const creditsReceived = creditInfo?.total_allocated ?? 0;
+                    const creditsUsed = creditInfo?.total_consumed ?? 0;
 
                     return {
                         id: scout.id,
@@ -204,25 +213,35 @@ export const userService = {
                 })
             );
 
-            if (webscoutersWithStats.length === 0) {
-                return vendedorId ? MOCK_WEBSCOUTERS.filter(w => w.vendedorId === vendedorId) : MOCK_WEBSCOUTERS;
-            }
             return webscoutersWithStats;
         } catch (error) {
-            console.warn("⚠️ Supabase: Usando dados mockados para Webscouters.");
-            return vendedorId ? MOCK_WEBSCOUTERS.filter(w => w.vendedorId === vendedorId) : MOCK_WEBSCOUTERS;
+            console.warn("⚠️ Supabase: Falha ao buscar webscouters reais.", error);
+            return [];
         }
     },
 
     async createVendedor(data: any): Promise<any> {
-        // 1. Supabase Auth signup
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        // 1. Supabase Auth signup using temporary non-persisting client
+        const tempSupabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+            {
+                auth: {
+                    persistSession: false,
+                    autoRefreshToken: false,
+                    detectSessionInUrl: false
+                }
+            }
+        );
+
+        const { data: authData, error: authError } = await tempSupabase.auth.signUp({
             email: data.email,
             password: data.password,
             options: {
                 data: {
                     nome: data.name,
-                    role: 'vendedor'
+                    role: 'vendedor',
+                    initial_credits: Number(data.initialCredits)
                 }
             }
         });
@@ -230,25 +249,56 @@ export const userService = {
         if (authError) throw authError;
         if (!authData.user) throw new Error("Erro ao gerar conta.");
 
-        // 2. Insert user record into public.users table (trigger handles this but reinforcement is safer)
-        try {
-            await supabase.from('users').insert([{
-                id: authData.user.id,
-                nome: data.name,
-                email: data.email,
-                role: 'vendedor',
-                team_id: data.teamName,
-                status: 'active'
-            }]);
+        // At this point, public.users and public.credits profiles are automatically created by the trigger handle_new_user()
+        // with the correct role ('vendedor') and initial_credits.
 
-            // Set initial credits
-            await supabase.from('credits').insert([{
-                user_id: authData.user.id,
-                balance: Number(data.initialCredits),
-                total_allocated: Number(data.initialCredits)
-            }]);
-        } catch (e) {
-            console.warn("Pre-existing profile setup complete via database trigger:", e);
+        try {
+            // 2. Insert the Team in public.teams table
+            const { data: teamData, error: teamError } = await supabase
+                .from('teams')
+                .insert([{
+                    nome: data.teamName,
+                    vendedor_id: authData.user.id
+                }])
+                .select()
+                .single();
+
+            if (teamError) throw teamError;
+
+            // 3. Link the Vendedor to this team by updating team_id in public.users
+            const { error: userUpdateError } = await supabase
+                .from('users')
+                .update({ team_id: teamData.id })
+                .eq('id', authData.user.id);
+
+            if (userUpdateError) throw userUpdateError;
+
+            // 4. Deduct initial credits from Admin's balance
+            const initialCredits = Number(data.initialCredits);
+            if (initialCredits > 0) {
+                const { data: { user: currentUser } } = await supabase.auth.getUser();
+                if (currentUser) {
+                    const { data: adminCredits, error: creditsError } = await supabase
+                        .from('credits')
+                        .select('balance')
+                        .eq('user_id', currentUser.id)
+                        .single();
+
+                    if (!creditsError && adminCredits) {
+                        const { error: deductError } = await supabase
+                            .from('credits')
+                            .update({
+                                balance: adminCredits.balance - initialCredits
+                            })
+                            .eq('user_id', currentUser.id);
+                        if (deductError) console.error("Error deducting admin balance:", deductError);
+                    }
+                }
+            }
+
+        } catch (dbErr: any) {
+            console.error("Erro ao configurar equipe/perfis no banco:", dbErr);
+            throw new Error(`Cadastro no Auth foi feito, mas falhou ao configurar perfil/equipe: ${dbErr.message}`);
         }
 
         return authData.user;
@@ -257,15 +307,40 @@ export const userService = {
     async createWebscouter(data: any): Promise<any> {
         // Get the active seller (creator)
         const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) throw new Error("Usuário não autenticado.");
 
-        // 1. Supabase Auth signup for webscouter
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        // Get the seller's profile to find their team_id
+        const { data: sellerProfile, error: profileError } = await supabase
+            .from('users')
+            .select('team_id')
+            .eq('id', currentUser.id)
+            .single();
+
+        if (profileError || !sellerProfile) {
+            throw new Error("Erro ao carregar perfil do vendedor atual para vincular equipe.");
+        }
+
+        // 1. Supabase Auth signup for webscouter using temporary non-persisting client
+        const tempSupabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+            {
+                auth: {
+                    persistSession: false,
+                    autoRefreshToken: false,
+                    detectSessionInUrl: false
+                }
+            }
+        );
+
+        const { data: authData, error: authError } = await tempSupabase.auth.signUp({
             email: data.email,
             password: data.password,
             options: {
                 data: {
                     nome: data.name,
-                    role: 'webscouter'
+                    role: 'webscouter',
+                    initial_credits: Number(data.initialCredits)
                 }
             }
         });
@@ -273,27 +348,55 @@ export const userService = {
         if (authError) throw authError;
         if (!authData.user) throw new Error("Erro ao gerar conta.");
 
-        // 2. Insert user profile with vinculation
-        try {
-            await supabase.from('users').insert([{
-                id: authData.user.id,
-                nome: data.name,
-                email: data.email,
-                role: 'webscouter',
-                vendedor_id: currentUser?.id,
-                status: 'active'
-            }]);
+        // At this point, public.users and public.credits profiles are automatically created by the trigger handle_new_user()
+        // with the correct role ('webscouter') and initial_credits.
 
-            // Set initial credits
-            await supabase.from('credits').insert([{
-                user_id: authData.user.id,
-                balance: Number(data.initialCredits),
-                total_allocated: Number(data.initialCredits)
-            }]);
-        } catch (e) {
-            console.warn("Profile setup complete via trigger:", e);
+        try {
+            // 2. Insert user profile vinculation (vendedor_id and team_id)
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({
+                    vendedor_id: currentUser.id,
+                    team_id: sellerProfile.team_id
+                })
+                .eq('id', authData.user.id);
+
+            if (updateError) throw updateError;
+
+            // 3. Deduct initial credits from Vendedor's balance
+            const initialCredits = Number(data.initialCredits);
+            if (initialCredits > 0) {
+                const { data: sellerCredits, error: creditsError } = await supabase
+                    .from('credits')
+                    .select('balance')
+                    .eq('user_id', currentUser.id)
+                    .single();
+                
+                if (creditsError) throw creditsError;
+                if ((sellerCredits?.balance || 0) < initialCredits) {
+                    throw new Error("Saldo do vendedor insuficiente para alocar créditos iniciais.");
+                }
+
+                const { error: deductError } = await supabase
+                    .from('credits')
+                    .update({
+                        balance: sellerCredits.balance - initialCredits
+                    })
+                    .eq('user_id', currentUser.id);
+
+                if (deductError) throw deductError;
+            }
+
+        } catch (dbErr: any) {
+            console.error("Erro ao vincular webscouter à equipe:", dbErr);
+            throw new Error(`Cadastro no Auth foi feito, mas falhou ao vincular à equipe: ${dbErr.message}`);
         }
 
         return authData.user;
+    },
+
+    async deleteUser(userId: string): Promise<void> {
+        const { error } = await supabase.rpc('delete_user', { target_user_id: userId });
+        if (error) throw error;
     }
 };

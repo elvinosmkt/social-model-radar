@@ -16,10 +16,29 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
+import { userService } from "@/services/user-service";
+import { useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
     const { user } = useAuth();
     
+    // User profile state
+    const [role, setRole] = useState("webscouter");
+    const [fullName, setFullName] = useState("");
+
+    // Fetch user profile dynamically
+    useEffect(() => {
+        if (user) {
+            userService.getUserProfile(user.id).then(profile => {
+                if (profile) {
+                    setRole(profile.role);
+                    setFullName(profile.nome);
+                }
+            });
+        }
+    }, [user]);
+
     // States for Password Reset
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -100,11 +119,11 @@ export default function SettingsPage() {
                         <div className="backdrop-blur-md bg-white/[0.02] border border-white/[0.05] rounded-3xl p-6 flex flex-col items-center text-center space-y-4">
                             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-purple-500 p-0.5 shadow-[0_0_30px_rgba(201,160,92,0.2)]">
                                 <div className="w-full h-full rounded-full bg-card flex items-center justify-center text-2xl font-extrabold text-primary uppercase">
-                                    {username.slice(0, 2)}
+                                    {(fullName || username).slice(0, 2)}
                                 </div>
                             </div>
                             <div>
-                                <h3 className="font-outfit font-bold text-lg text-white capitalize">{username}</h3>
+                                <h3 className="font-outfit font-bold text-lg text-white capitalize">{fullName || username}</h3>
                                 <p className="text-xs text-text-secondary">{email}</p>
                             </div>
                             <div className="w-full pt-4 border-t border-white/[0.05] text-left space-y-2 text-xs">
@@ -114,7 +133,12 @@ export default function SettingsPage() {
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-text-secondary/70">Nível de Acesso:</span>
-                                    <span className="font-semibold text-primary uppercase tracking-wider text-[10px] bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">Admin</span>
+                                    <span className={cn(
+                                        "font-semibold uppercase tracking-wider text-[10px] px-2 py-0.5 rounded-md border",
+                                        role === 'admin' ? "text-primary bg-primary/10 border-primary/20" :
+                                        role === 'vendedor' ? "text-blue-400 bg-blue-500/10 border-blue-500/20" :
+                                        "text-purple-400 bg-purple-500/10 border-purple-500/20"
+                                    )}>{role}</span>
                                 </div>
                             </div>
                         </div>

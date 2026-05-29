@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Header } from "@/components/shared/Header";
+import { useAuth } from "@/lib/context/AuthContext";
 import {
     Users,
     TrendingUp,
@@ -20,40 +21,46 @@ import { ROITracking } from "@/components/dashboard/ROITracking";
 import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
+    const { user } = useAuth();
     const [statusStats, setStatusStats] = useState<any[]>([]);
     const [nicheStats, setNicheStats] = useState<any[]>([]);
     const [comparisonLeads, setComparisonLeads] = useState<any[]>([]);
     const [leads, setLeads] = useState<any[]>([]);
     const [activities, setActivities] = useState<any[]>([]);
+    const [dailyApproaches, setDailyApproaches] = useState(12);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         async function fetchData() {
+            if (!user) return;
             try {
-                const [status, niches, compLeads, allLeads, recent] = await Promise.all([
+                const [status, niches, compLeads, allLeads, recent, dailyCount] = await Promise.all([
                     leadService.getStatusStats(),
                     leadService.getNicheStats(),
                     leadService.getComparisonLeads(),
                     leadService.getLeads(),
-                    leadService.getRecentActivities()
+                    leadService.getRecentActivities(),
+                    leadService.getDailyApproachesCount(user.id)
                 ]);
                 setStatusStats(status);
                 setNicheStats(niches);
                 setComparisonLeads(compLeads);
                 setLeads(allLeads);
                 setActivities(recent);
+                setDailyApproaches(dailyCount);
             } catch (error) {
                 console.error("Failed to fetch dashboard stats:", error);
             } finally {
                 setIsLoading(false);
             }
         }
-        fetchData();
-    }, []);
+        if (user) {
+            fetchData();
+        }
+    }, [user]);
 
     // Calculate dynamic stats
     const leadsCount = leads.length;
-    const isDemoMode = leadsCount === 0;
 
     const qualCount = leads.filter(l => (l.ai_score || 0) >= 70).length;
     const inConvCount = leads.filter(l => l.status === 'in_conversation').length;
@@ -61,30 +68,20 @@ export default function DashboardPage() {
     const convertedCount = leads.filter(l => l.status === 'selected' || l.status === 'converted').length;
     const qualRate = leadsCount ? Math.round((qualCount / leadsCount) * 100) : 0;
 
-    // Demo Data for empty states
-    const demoStatusStats = [
-        { name: 'Novos', value: 420, color: '#3B82F6' },
-        { name: 'Para Abordar', value: 280, color: '#8B5CF6' },
-        { name: 'Abordados', value: 150, color: '#F59E0B' },
-        { name: 'Em Conversa', value: 85, color: '#EC4899' },
-        { name: 'Selecionados', value: 24, color: '#10B981' },
-    ];
+    // Count high fit leads dynamically
+    const highFitCount = leads.filter(l => (l.ai_score || 0) >= 90).length;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const highFitTodayCount = leads.filter(l => (l.ai_score || 0) >= 90 && new Date(l.created_at || l.criado_em || '') >= startOfToday).length;
 
-    const demoNicheStats = [
-        { name: 'Beauty', value: 45 },
-        { name: 'Fashion', value: 30 },
-        { name: 'Lifestyle', value: 15 },
-        { name: 'Fitness', value: 10 },
-    ];
-
-    const displayStatusStats = isDemoMode ? demoStatusStats : statusStats;
-    const displayNicheStats = isDemoMode ? demoNicheStats : nicheStats;
+    const displayStatusStats = statusStats;
+    const displayNicheStats = nicheStats;
 
     const stats = [
-        { label: "Leads Captados", value: isDemoMode ? "1.284" : leadsCount.toLocaleString(), trend: isDemoMode ? "+12%" : "+100%", icon: Users, color: "text-primary" },
-        { label: "Taxa de Qualificação (>=70)", value: isDemoMode ? "66%" : `${qualRate}%`, trend: isDemoMode ? "+5%" : "+5%", icon: Zap, color: "text-blue-400" },
-        { label: "Em Conversa", value: isDemoMode ? "85" : inConvCount.toString(), trend: isDemoMode ? "+15%" : "+15%", icon: Target, color: "text-amber-400" },
-        { label: "Convertidas", value: isDemoMode ? "24" : convertedCount.toString(), trend: isDemoMode ? "+8%" : "+8%", icon: CheckCircle2, color: "text-success" },
+        { label: "Leads Captados", value: leadsCount.toLocaleString(), trend: leadsCount ? "+100%" : "+0%", icon: Users, color: "text-primary" },
+        { label: "Taxa de Qualificação (>=70)", value: `${qualRate}%`, trend: leadsCount ? "+5%" : "+0%", icon: Zap, color: "text-blue-400" },
+        { label: "Em Conversa", value: inConvCount.toString(), trend: inConvCount ? "+15%" : "+0%", icon: Target, color: "text-amber-400" },
+        { label: "Convertidas", value: convertedCount.toString(), trend: convertedCount ? "+8%" : "+0%", icon: CheckCircle2, color: "text-success" },
     ];
 
     if (isLoading) {
@@ -115,7 +112,15 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <p className="text-sm font-bold font-outfit">Análise de IA Concluída</p>
-                                <p className="text-xs text-text-secondary">Encontramos 15 novos perfis com fit score superior a 90% hoje.</p>
+                                <p className="text-xs text-text-secondary">
+                                    {highFitTodayCount > 0 ? (
+                                        `Encontramos ${highFitTodayCount} novos perfis com fit score superior a 90% hoje.`
+                                    ) : highFitCount > 0 ? (
+                                        `Encontramos ${highFitCount} perfis com fit score superior a 90% na sua base.`
+                                    ) : (
+                                        "Nenhum perfil com fit score >= 90% localizado na base hoje."
+                                    )}
+                                </p>
                             </div>
                         </div>
                         <ArrowUpRight className="w-5 h-5 text-text-secondary group-hover:text-primary transition-colors" />
@@ -129,11 +134,16 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <p className="text-xs font-bold uppercase tracking-widest text-text-secondary">Meta Diária (Webscouter)</p>
-                                <p className="text-lg font-outfit font-bold">12 / 30 <span className="text-xs font-normal text-text-secondary">Abordagens</span></p>
+                                <p className="text-lg font-outfit font-bold">
+                                    {dailyApproaches} / 30 <span className="text-xs font-normal text-text-secondary">Abordagens</span>
+                                </p>
                             </div>
                         </div>
                         <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                            <div className="h-full bg-success w-[40%]" />
+                            <div 
+                                className="h-full bg-success transition-all duration-500" 
+                                style={{ width: `${Math.min(100, (dailyApproaches / 30) * 100)}%` }} 
+                            />
                         </div>
                     </div>
                 </div>
@@ -167,7 +177,6 @@ export default function DashboardPage() {
                     qualCount={qualCount}
                     approachedCount={approachedCount}
                     convertedCount={convertedCount}
-                    isDemoMode={isDemoMode}
                 />
                 <ModelComparison leads={comparisonLeads} />
 

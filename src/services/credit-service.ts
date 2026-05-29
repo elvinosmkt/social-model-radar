@@ -18,11 +18,11 @@ export const creditService = {
             if (error) throw error;
             return data as UserCredits;
         } catch (error) {
-            console.warn("⚠️ Supabase: Falha ao buscar créditos reais, usando saldo simulado (380).");
+            console.warn("⚠️ Supabase: Falha ao buscar créditos reais.", error);
             return {
-                balance: 380,
-                total_allocated: 600,
-                total_consumed: 220
+                balance: 0,
+                total_allocated: 0,
+                total_consumed: 0
             };
         }
     },
@@ -99,7 +99,9 @@ export const creditService = {
 
             if (err2) throw err2;
         } catch (error: any) {
-            console.warn("⚠️ Supabase: Consumo de créditos ignorado no banco (ambiente local / tabelas ausentes).", error.message);
+            console.error("❌ Erro no controle de créditos:", error.message);
+            // Propagate insufficient credits and connection issues to caller
+            throw error;
         }
     }
 };

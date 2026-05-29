@@ -15,13 +15,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Lead, leadService } from "@/services/lead-service";
+import { useAuth } from "@/lib/context/AuthContext";
 
 export default function MetricsPage() {
+    const { user } = useAuth();
     const [leads, setLeads] = useState<Lead[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         async function fetchLeads() {
+            if (!user) return;
             try {
                 const allLeads = await leadService.getLeads();
                 setLeads(allLeads);
@@ -31,14 +34,15 @@ export default function MetricsPage() {
                 setIsLoading(false);
             }
         }
-        fetchLeads();
-    }, []);
+        if (user) {
+            fetchLeads();
+        }
+    }, [user]);
 
     // ═══════════════════════════════════════════════════
     // CÁLCULOS DE MÉTRICAS REAIS (SUPABASE)
     // ═══════════════════════════════════════════════════
     const totalLeads = leads.length;
-    const isDemoMode = totalLeads === 0;
     
     // 1. Taxa de Conversão: Leads em 'selected' ou 'converted' sobre o total
     const convertedLeads = leads.filter(l => l.status === 'selected' || l.status === 'converted').length;
@@ -55,7 +59,7 @@ export default function MetricsPage() {
         }, 0);
         avgDays = Number((totalDiff / leadsWithDuration.length / (1000 * 60 * 60 * 24)).toFixed(1));
     }
-    const avgApproachTime = isDemoMode ? "1.4 dias" : `${avgDays} dias`;
+    const avgApproachTime = `${avgDays} dias`;
 
     // 3. Leads Qualificados: Percentual com score de IA >= 70
     const qualCount = leads.filter(l => (l.ai_score || 0) >= 70).length;
@@ -64,12 +68,7 @@ export default function MetricsPage() {
     // 4. Média de Fit Score
     const avgFitScore = totalLeads ? Math.round(leads.reduce((acc, curr) => acc + (curr.ai_score || 0), 0) / totalLeads) : 0;
 
-    const mainMetrics = isDemoMode ? [
-        { label: "Taxa de Conversão", value: "1.8%", change: "+1.2%", positive: true },
-        { label: "Tempo Médio p/ Abordagem", value: "1.4 dias", change: "-0.2d", positive: true },
-        { label: "Leads Qualificados (>=70)", value: "66%", change: "+4%", positive: true },
-        { label: "Média de Fit Score", value: "84/100", change: "+2", positive: true },
-    ] : [
+    const mainMetrics = [
         { label: "Taxa de Conversão", value: conversionRate, change: "Estável", positive: true },
         { label: "Tempo Médio p/ Abordagem", value: avgApproachTime, change: "Tempo real", positive: true },
         { label: "Leads Qualificados (>=70)", value: qualifiedLeadsRate, change: "Pontuação", positive: true },
@@ -89,12 +88,7 @@ export default function MetricsPage() {
     const stg3To4 = stage3Count ? Math.round((stage4Count / stage3Count) * 100) : 0;
     const stg4ToConv = stage4Count ? 100 : 0;
 
-    const funnelStages = isDemoMode ? [
-        { label: "Captação → Abordagem", value: 85, color: "bg-blue-400" },
-        { label: "Abordagem → Resposta (Conversa)", value: 42, color: "bg-purple-400" },
-        { label: "Resposta → Seleção", value: 12, color: "bg-pink-400" },
-        { label: "Seleção → Conversão", value: 4, color: "bg-emerald-400" },
-    ] : [
+    const funnelStages = [
         { label: "Captação → Abordagem", value: stg1To2, color: "bg-blue-400" },
         { label: "Abordagem → Resposta (Conversa)", value: stg2To3, color: "bg-purple-400" },
         { label: "Resposta → Seleção", value: stg3To4, color: "bg-pink-400" },
@@ -117,22 +111,20 @@ export default function MetricsPage() {
         return Math.round((count / totalLeads) * 100);
     };
 
-    const fashionPercent = isDemoMode ? 45 : calcPercent(fashionCount);
-    const beautyPercent = isDemoMode ? 30 : calcPercent(beautyCount);
-    const lifestylePercent = isDemoMode ? 15 : calcPercent(lifestyleCount);
-    const otherPercent = isDemoMode ? 10 : calcPercent(fitnessCount + otherCount);
+    const fashionPercent = calcPercent(fashionCount);
+    const beautyPercent = calcPercent(beautyCount);
+    const lifestylePercent = calcPercent(lifestyleCount);
+    const otherPercent = calcPercent(fitnessCount + otherCount);
 
-    const topNicheName = isDemoMode 
-        ? "#moda" 
-        : totalLeads === 0 
-            ? "Nenhum"
-            : fashionCount >= beautyCount && fashionCount >= lifestyleCount && fashionCount >= fitnessCount 
-                ? "#moda" 
-                : beautyCount >= lifestyleCount && beautyCount >= fitnessCount 
-                    ? "#beleza" 
-                    : lifestyleCount >= fitnessCount 
-                        ? "#lifestyle" 
-                        : "#fitness";
+    const topNicheName = totalLeads === 0 
+        ? "Nenhum"
+        : fashionCount >= beautyCount && fashionCount >= lifestyleCount && fashionCount >= fitnessCount 
+            ? "#moda" 
+            : beautyCount >= lifestyleCount && beautyCount >= fitnessCount 
+                ? "#beleza" 
+                : lifestyleCount >= fitnessCount 
+                    ? "#lifestyle" 
+                    : "#fitness";
 
     if (isLoading) {
         return (
