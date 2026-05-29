@@ -10,10 +10,14 @@ import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { useAuth } from "@/lib/context/AuthContext";
 
+import { userService } from "@/services/user-service";
+import { creditService } from "@/services/credit-service";
+import { useState, useEffect } from "react";
+
 // ── SIMULAÇÃO DE ROLE (em prod virá do JWT/Context) ──────────────
 // Troque o valor para ver o menu de cada perfil:
 // "admin" | "vendedor" | "webscouter"
-const CURRENT_ROLE = "admin" as "admin" | "vendedor" | "webscouter";
+const CURRENT_ROLE = "webscouter" as "admin" | "vendedor" | "webscouter";
 
 const ROLE_CONFIG = {
     admin:       { label: "Administrador", badge: "ADM",       color: "bg-primary/20 text-primary",           icon: ShieldCheck },
@@ -64,19 +68,60 @@ export function Sidebar() {
     const pathname = usePathname();
     const { user, signOut } = useAuth();
 
-    const role = CURRENT_ROLE;
-    const roleInfo = ROLE_CONFIG[role];
+    const [role, setRole] = useState<"admin" | "vendedor" | "webscouter">("webscouter");
+    const [userName, setUserName] = useState("Usuário");
+    const [userCredits, setUserCredits] = useState({ used: 0, total: 100 });
+
+    useEffect(() => {
+        if (user) {
+            // 1. Fetch user profile
+            userService.getUserProfile(user.id).then(profile => {
+                if (profile) {
+                    setRole(profile.role);
+                    setUserName(profile.nome);
+                } else {
+                    // Fallback based on email prefixes for demo seamless compatibility
+                    const email = user.email || "";
+                    if (email.startsWith("admin")) {
+                        setRole("admin");
+                        setUserName("Administrador");
+                    } else if (email.startsWith("vendedor") || email.startsWith("carlos")) {
+                        setRole("vendedor");
+                        setUserName("Carlos Mendes");
+                    } else {
+                        setRole("webscouter");
+                        setUserName("Rafaela Costa");
+                    }
+                }
+            });
+
+            // 2. Fetch credits
+            creditService.getUserCredits(user.id).then(c => {
+                setUserCredits({
+                    used: c.total_consumed,
+                    total: c.total_allocated
+                });
+            });
+        }
+    }, [user]);
+
+    const roleInfo = {
+        admin:       { label: userName, badge: "ADM",       color: "bg-primary/20 text-primary",           icon: ShieldCheck },
+        vendedor:    { label: userName, badge: "VENDEDOR",  color: "bg-blue-500/20 text-blue-400",          icon: Briefcase   },
+        webscouter:  { label: userName, badge: "WEBSCOUTER",color: "bg-purple-500/20 text-purple-400",      icon: Zap         },
+    }[role];
+
     const roleNav = NAV_ROLE[role] || [];
 
     // Initials or email prefix for the avatar
     const email = user?.email || "admin@smr.com";
-    const displayName = email.split('@')[0];
+    const displayName = userName || email.split('@')[0];
     const initials = displayName.slice(0, 2).toUpperCase();
 
     // Créditos — só para vendedor e webscouter
     const creditData = {
-        vendedor:    { used: 712,  total: 2000, label: "Créditos livres" },
-        webscouter:  { used: 312,  total: 600,  label: "Meus créditos"  },
+        vendedor:    { used: userCredits.used,  total: userCredits.total, label: "Créditos alocados" },
+        webscouter:  { used: userCredits.used,  total: userCredits.total,  label: "Meus créditos"  },
         admin:       null,
     }[role];
 

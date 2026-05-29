@@ -28,6 +28,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { captureAndAnalyzeLeadsAction, captureSimilarLeadsAction } from "@/app/actions/ai-actions";
 import { leadService } from "@/services/lead-service";
 import { ScoutingFilters } from "@/services/ai-service";
+import { useAuth } from "@/lib/context/AuthContext";
+import { creditService } from "@/services/credit-service";
+import { useEffect } from "react";
 
 const COUNTRIES = ["Brasil", "Portugal", "EUA", "Argentina", "México", "Espanha", "Colômbia"];
 const LANGUAGES = ["Português", "Inglês", "Espanhol", "Francês", "Italiano"];
@@ -41,18 +44,29 @@ function formatNumber(num: number | null | undefined): string {
 }
 
 export default function CapturePage() {
+    const { user } = useAuth();
     const [mode, setMode] = useState<'prompt' | 'lookalike'>('prompt');
     const [prompt, setPrompt]         = useState("");
     const [quantity, setQuantity]     = useState(10);
     const [showFilters, setShowFilters] = useState(false);
     const [showQty, setShowQty]       = useState(false);
     const [isSearching, setIsSearching] = useState(false);
+    const [balance, setBalance]       = useState(380);
 
     // Results states
     const [results, setResults] = useState<any[]>([]);
     const [filters, setFilters] = useState<ScoutingFilters | null>(null);
     const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
     const [selectedToExport, setSelectedToExport] = useState<Set<string>>(new Set());
+
+    // Fetch credits dynamically from Supabase
+    useEffect(() => {
+        if (user) {
+            creditService.getUserCredits(user.id).then(c => {
+                setBalance(c.balance);
+            });
+        }
+    }, [user]);
 
     // Advanced filters from partner
     const [country,  setCountry]  = useState("Brasil");
@@ -207,6 +221,11 @@ export default function CapturePage() {
         const searchQuery = mode === 'prompt' ? prompt : lookalike;
         if (!searchQuery.trim()) return;
 
+        if (balance < quantity) {
+            showNotification('error', 'Créditos Insuficientes', `Essa busca requer ${quantity} créditos, mas você possui apenas ${balance} disponíveis.`);
+            return;
+        }
+
         setIsSearching(true);
         setResults([]);
         setFilters(null);
@@ -217,10 +236,22 @@ export default function CapturePage() {
                 const { filters: extractedFilters, results: searchResults } = await captureAndAnalyzeLeadsAction(searchQuery);
                 setResults(searchResults);
                 setFilters(extractedFilters);
+
+                // Consume credits from database dynamically
+                if (user && searchResults.length > 0) {
+                    await creditService.consumeCredits(user.id, quantity);
+                    setBalance(prev => Math.max(0, prev - quantity));
+                }
             } else {
                 const searchResults = await captureSimilarLeadsAction(searchQuery);
                 setResults(searchResults.results);
                 setFilters(searchResults.filters);
+
+                // Consume credits from database dynamically
+                if (user && searchResults.results.length > 0) {
+                    await creditService.consumeCredits(user.id, quantity);
+                    setBalance(prev => Math.max(0, prev - quantity));
+                }
             }
         } catch (error: any) {
             console.error("Failed to search leads:", error);
@@ -378,7 +409,7 @@ export default function CapturePage() {
                                 {[5,10,15,20,25,30,35,40,45,50].map(v => <span key={v}>{v}</span>)}
                             </div>
                             <p className="text-[11px] text-text-secondary mt-3">
-                                Custo de busca: <span className="text-primary font-bold">{quantity} créditos</span> · Sua conta tem <span className="font-bold text-white">380 disponíveis</span>
+                                Custo de busca: <span className="text-primary font-bold">{quantity} créditos</span> · Sua conta tem <span className="font-bold text-white">{balance} disponíveis</span>
                             </p>
                         </div>
                     </motion.div>

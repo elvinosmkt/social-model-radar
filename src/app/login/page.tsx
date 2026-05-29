@@ -52,11 +52,35 @@ export default function LoginPage() {
 
         // 2. Fallback to Supabase Auth
         try {
-            const { error: authError } = await supabase.auth.signInWithPassword({
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
                 email,
                 password,
             });
             if (authError) throw authError;
+
+            // Fetch role from Supabase public.users table
+            if (authData.user) {
+                try {
+                    const { data: profile, error: profileError } = await supabase
+                        .from('users')
+                        .select('role')
+                        .eq('id', authData.user.id)
+                        .single();
+
+                    if (!profileError && profile) {
+                        if (profile.role === 'admin') {
+                            router.push("/admin");
+                            return;
+                        } else if (profile.role === 'vendedor') {
+                            router.push("/vendedor");
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Could not fetch user role, defaulting to dashboard", e);
+                }
+            }
+
             router.push("/dashboard");
         } catch (err: any) {
             console.error("Auth error:", err);
